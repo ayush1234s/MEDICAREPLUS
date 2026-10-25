@@ -16,6 +16,7 @@
 
 #include "MediCareDashboard.h"
 #include "MediCareFirebase.h"
+#include "MediCareQrCode.h"
 
 #ifndef MEDICINE_REMINDER_TEST_MODE
 #define MEDICINE_REMINDER_TEST_MODE false
@@ -3041,24 +3042,26 @@ void updateSpO2Measurement() {
 
 void drawAboutPage() {
   fillRect(0, 0, SCREEN_W, SCREEN_H, BLACK);
-  fillRect(0, 0, SCREEN_W, 34, DARKBLUE);
-  fillRect(0, 32, SCREEN_W, 2, CYAN);
-  drawCentered("ABOUT", 12, WHITE, 1);
+  drawCentered("MEDICARE+", 8, CYAN, 2);
+  drawCentered("YOUR SMART MEDICAL KIT", 30, WHITE, 1);
 
-  // Main content area
-  drawCentered("SMART POCKET", 44, WHITE, 2);
-  drawCentered("MEDICAL KIT", 62, WHITE, 2);
-  drawCentered("MEDICARE+", 86, CYAN, 2);
-  fillRect(80, 104, 160, 1, DARKGREY);
+  // Render the supplied 37x37 QR matrix at 4x4 pixels per module.
+  const uint8_t modulePx = 4;
+  const int qrSize = MEDICARE_QR_MODULES * modulePx;
+  const int qrX = (SCREEN_W - qrSize) / 2;
+  const int qrY = 48;
+  fillRect(qrX, qrY, qrSize, qrSize, WHITE);
+  for (uint8_t row = 0; row < MEDICARE_QR_MODULES; row++) {
+    for (uint8_t col = 0; col < MEDICARE_QR_MODULES; col++) {
+      if (MEDICARE_QR_ROWS[row] & (1ULL << (MEDICARE_QR_MODULES - 1 - col))) {
+        fillRect(qrX + col * modulePx, qrY + row * modulePx, modulePx, modulePx, BLACK);
+      }
+    }
+  }
 
-  drawCentered("LOCAL HEALTH MONITORING", 116, LIGHTGREY, 1);
-  drawCentered("SpO2 AND HEART RATE", 140, CYAN, 1);
-  drawCentered("LOCAL DEVICE MONITORING", 164, WHITE, 1);
-  drawCentered("NO INTERNET REQUIRED", 180, WHITE, 1);
-
-  // Bottom bar
-  fillRect(0, 230, SCREEN_W, 10, DARKBLUE);
-  drawCentered("PRESS BACK FOR HOME", 232, LIGHTGREY, 1);
+  drawCentered("SEE YOUR DATA IN WEB", 204, CYAN, 1);
+  drawCentered("medicarepluss.vercel.app", 218, LIGHTGREY, 1);
+  drawCentered("PRESS BACK FOR HOME", 232, DARKGREY, 1);
 }
 
 void drawButtonPage(uint8_t page) {

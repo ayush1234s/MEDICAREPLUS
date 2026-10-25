@@ -61,6 +61,16 @@ const notifyPermissionWarning = () => {
 
 // Authentication Helpers
 export const loginWithGoogle = async () => {
+  // Mobile browsers commonly block popup windows. Redirect is the supported
+  // Firebase flow there and App.jsx completes the profile setup after return.
+  const isMobile = typeof window !== 'undefined' && (
+    /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    window.matchMedia('(max-width: 767px)').matches
+  );
+  if (isMobile) {
+    await signInWithRedirect(auth, googleProvider);
+    return null;
+  }
   try {
     return await signInWithPopup(auth, googleProvider);
   } catch (err) {

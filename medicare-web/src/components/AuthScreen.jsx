@@ -84,15 +84,11 @@ export default function AuthScreen({ onLoginSuccess }) {
     setLoading(true);
     try {
       const res = await loginWithGoogle();
-      // check/create profile in db
-      const user = res.user;
-      const medicareId = generateMedicareId(user.uid);
-      await saveUserProfileToDb(user.uid, {
-        name: user.displayName || 'Medicare User',
-        email: user.email,
-        photoURL: user.photoURL,
-        medicareId: medicareId
-      });
+      // Mobile uses Firebase redirect; profile setup continues from App.jsx
+      // after the user returns to this site.
+      if (!res) return;
+      // App.jsx creates the profile only when it is missing, preventing a
+      // returning Google user from receiving a different Medicare ID.
       if (onLoginSuccess) onLoginSuccess();
     } catch (err) {
       console.error(err);

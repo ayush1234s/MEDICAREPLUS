@@ -29,6 +29,8 @@ export default function TestPage({ liveVitals }) {
   const [loading, setLoading] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [healthAlert, setHealthAlert] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   // Animated ECG Canvas ref
   const canvasRef = useRef(null);
@@ -54,6 +56,13 @@ export default function TestPage({ liveVitals }) {
     }
   }, [activeSubView]);
 
+  useEffect(() => {
+    const spo2 = Number(liveVitals?.spo2?.spo2);
+    const bpm = Number(liveVitals?.spo2?.bpm || liveVitals?.ecg?.bpm);
+    if (spo2 && spo2 < 95) setHealthAlert({ title: 'Low SpO2 detected', text: `Current oxygen saturation is ${spo2}%. Please rest and seek medical advice if it remains low or you feel unwell.` });
+    else if (bpm && (bpm < 60 || bpm > 100)) setHealthAlert({ title: 'Heart-rate attention', text: `Current heart rate is ${bpm} BPM. If you have symptoms or this persists, contact a doctor.` });
+  }, [liveVitals]);
+
   const handleFilterSubmit = (e) => {
     e.preventDefault();
     loadReadings(activeSubView, fromDate, toDate);
@@ -66,7 +75,7 @@ export default function TestPage({ liveVitals }) {
   };
 
   const handleDeleteReading = async (id) => {
-    if (!confirm("Are you sure you want to delete this sensor reading log? It will be removed from Firebase.")) return;
+    if (!id) return;
     setDeletingId(id);
     try {
       await deleteReadingFromDb(activeSubView, id);
@@ -79,7 +88,6 @@ export default function TestPage({ liveVitals }) {
   };
 
   const handleClearAllReadings = async () => {
-    if (!confirm("Purge all test/simulation logs? This removes mock logs from Firebase and local cache so only your real hardware measurements appear.")) return;
     setLoading(true);
     try {
       localStorage.removeItem('readings_' + activeSubView.toLowerCase());
@@ -212,6 +220,8 @@ export default function TestPage({ liveVitals }) {
 
   return (
     <div className="space-y-8 pb-16 max-w-6xl mx-auto">
+      {healthAlert && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm"><div className="w-full max-w-sm rounded-3xl border border-amber-400/40 bg-slate-900 p-6 shadow-2xl"><AlertTriangle className="w-7 h-7 text-amber-400 mb-3" /><h3 className="text-lg font-bold text-white">{healthAlert.title}</h3><p className="text-sm text-slate-300 mt-2">{healthAlert.text}</p><button onClick={() => setHealthAlert(null)} className="mt-6 w-full rounded-xl bg-amber-400 py-2.5 text-sm font-bold text-slate-950">I Understand</button></div></div>}
+      {confirmAction && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"><div className="w-full max-w-sm rounded-3xl border border-rose-400/30 bg-slate-900 p-6 shadow-2xl"><div className="w-11 h-11 rounded-2xl bg-rose-500/15 text-rose-400 flex items-center justify-center mb-4"><Trash2 className="w-5 h-5" /></div><h3 className="text-lg font-bold text-white">{confirmAction.kind === 'all' ? 'Clear all records?' : 'Delete sensor record?'}</h3><p className="text-sm text-slate-400 mt-2">{confirmAction.kind === 'all' ? 'All displayed test records will be removed from Firebase and local storage.' : 'This sensor reading will be permanently removed from Firebase.'}</p><div className="mt-6 flex gap-3"><button onClick={() => setConfirmAction(null)} className="flex-1 rounded-xl bg-slate-800 py-2.5 text-sm font-semibold text-slate-300">Cancel</button><button onClick={() => { const action = confirmAction; setConfirmAction(null); action.kind === 'all' ? handleClearAllReadings() : handleDeleteReading(action.id); }} className="flex-1 rounded-xl bg-rose-500 py-2.5 text-sm font-bold text-white">{confirmAction.kind === 'all' ? 'Clear records' : 'Delete record'}</button></div></div></div>}
       {/* 2 TILES OVERVIEW */}
       {activeSubView === 'TILES' && (
         <div className="space-y-8">
@@ -344,7 +354,7 @@ export default function TestPage({ liveVitals }) {
             {/* Action buttons */}
             <div className="flex items-center gap-2.5">
               <button
-                onClick={handleClearAllReadings}
+                onClick={() => setConfirmAction({ kind: 'all' })}
                 className="px-3.5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 title="Wipe mock/simulation logs and keep only real hardware readings"
               >
@@ -511,7 +521,7 @@ export default function TestPage({ liveVitals }) {
                         <td className="py-3.5 px-5 text-center">
                           <button
                             type="button"
-                            onClick={() => handleDeleteReading(r.id)}
+                            onClick={() => setConfirmAction({ kind: 'one', id: r.id })}
                             disabled={deletingId === r.id}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                             title="Delete this record"
@@ -558,7 +568,7 @@ export default function TestPage({ liveVitals }) {
 
             <div className="flex items-center gap-2.5">
               <button
-                onClick={handleClearAllReadings}
+                onClick={() => setConfirmAction({ kind: 'all' })}
                 className="px-3.5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 title="Wipe mock/simulation logs and keep only real hardware readings"
               >
@@ -729,7 +739,7 @@ export default function TestPage({ liveVitals }) {
                         <td className="py-3.5 px-5 text-center">
                           <button
                             type="button"
-                            onClick={() => handleDeleteReading(r.id)}
+                            onClick={() => setConfirmAction({ kind: 'one', id: r.id })}
                             disabled={deletingId === r.id}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                             title="Delete this record"

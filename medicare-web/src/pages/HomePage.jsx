@@ -26,9 +26,9 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
   const patientName = userProfile?.name || user?.displayName || user?.email?.split('@')[0] || 'Patient';
 
   return (
-    <div className="space-y-16 pb-16">
+    <div className="space-y-10 pb-16">
       {/* HERO SECTION */}
-      <section className="relative rounded-3xl overflow-hidden border border-slate-800 bg-gradient-to-b from-slate-900/90 via-slate-900/50 to-slate-950 p-6 sm:p-10 md:p-12 shadow-2xl">
+      <section className="relative rounded-[2rem] overflow-hidden border border-teal-400/15 bg-gradient-to-br from-[#14263e] via-[#102238] to-[#091426] p-6 sm:p-10 md:p-12 shadow-[0_26px_70px_-38px_rgba(0,0,0,.95)]">
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-10 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute inset-0 bg-ecg-grid opacity-25 pointer-events-none" />
@@ -46,7 +46,7 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
             <span>ESP32 Hardware Connected: Cloud Sync Active</span>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight mb-4">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-[-0.045em] leading-[.98] mb-5">
             MEDICARE<span className="text-cyan-400">+</span>
             <span className="block text-2xl sm:text-3xl lg:text-4xl font-extrabold bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-400 bg-clip-text text-transparent mt-1">
               Your Smart Pocket Medical Kit
@@ -86,8 +86,8 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
           </div>
 
           {/* Real-time Quick Metric Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="glass-card rounded-2xl p-4 border border-slate-800/80">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="glass-card rounded-2xl p-4 border border-white/10">
               <div className="flex items-center justify-between text-slate-400 text-xs mb-2 font-medium">
                 <span>Blood Oxygen</span>
                 <Heart className="w-4 h-4 text-cyan-400 fill-cyan-400/20" />
@@ -100,7 +100,7 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
               </span>
             </div>
 
-            <div className="glass-card rounded-2xl p-4 border border-slate-800/80">
+            <div className="glass-card rounded-2xl p-4 border border-white/10">
               <div className="flex items-center justify-between text-slate-400 text-xs mb-2 font-medium">
                 <span>Heart Rate</span>
                 <Activity className="w-4 h-4 text-rose-400" />
@@ -113,7 +113,7 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
               </span>
             </div>
 
-            <div className="glass-card rounded-2xl p-4 border border-slate-800/80">
+            <div className="glass-card rounded-2xl p-4 border border-white/10">
               <div className="flex items-center justify-between text-slate-400 text-xs mb-2 font-medium">
                 <span>Medications</span>
                 <Pill className="w-4 h-4 text-emerald-400" />
@@ -126,7 +126,7 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
               </span>
             </div>
 
-            <div className="glass-card rounded-2xl p-4 border border-slate-800/80">
+            <div className="glass-card rounded-2xl p-4 border border-white/10">
               <div className="flex items-center justify-between text-slate-400 text-xs mb-2 font-medium">
                 <span>Kit Link Status</span>
                 <Wifi className="w-4 h-4 text-cyan-400" />

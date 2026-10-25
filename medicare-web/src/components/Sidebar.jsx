@@ -65,7 +65,7 @@ export default function Sidebar({
 
       {/* Sidebar Drawer */}
       <aside 
-        className={`fixed top-0 bottom-0 left-0 z-50 bg-slate-900/95 border-r border-slate-800 backdrop-blur-2xl transition-all duration-300 flex flex-col justify-between ${
+        className={`fixed top-0 bottom-0 left-0 z-50 bg-[#0b1628]/95 border-r border-slate-700/60 backdrop-blur-2xl transition-all duration-300 flex flex-col justify-between shadow-[14px_0_48px_rgba(0,0,0,.26)] ${
           mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'
         } ${
           isCollapsed ? 'md:w-20' : 'md:w-64'
@@ -139,7 +139,7 @@ export default function Sidebar({
 
           {/* Live ESP32 Status Pill */}
           {(!isCollapsed || mobileOpen) ? (
-            <div className="mx-3 mt-4 mb-2 p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-800/40 flex items-center justify-between text-xs">
+            <div className="mx-3 mt-5 mb-3 p-3 rounded-2xl bg-gradient-to-br from-teal-500/15 to-cyan-500/5 border border-teal-400/20 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -172,8 +172,8 @@ export default function Sidebar({
                   title={isCollapsed && !mobileOpen ? item.label : undefined}
                   className={`w-full flex items-center justify-center md:justify-start gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold transition-all group cursor-pointer ${
                     isActive
-                      ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/10 text-cyan-400 border border-cyan-500/30 shadow-md shadow-cyan-500/10'
-                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                      ? 'bg-gradient-to-r from-teal-400/20 to-cyan-500/10 text-teal-300 border border-teal-400/25 shadow-md shadow-teal-500/10'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-white/[.045]'
                   }`}
                 >
                   <IconComponent className={`w-5 h-5 shrink-0 transition-transform group-hover:scale-110 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
@@ -254,6 +254,7 @@ export default function Sidebar({
               <img
                 src={photoURL}
                 alt={displayName}
+                referrerPolicy="no-referrer"
                 className="w-9 h-9 rounded-full object-cover ring-2 ring-cyan-500/40 shrink-0"
               />
             ) : (

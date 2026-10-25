@@ -6,6 +6,8 @@ import {
   subscribeToLiveVitals, 
   subscribeToMedicines, 
   getUserProfileFromDb,
+  saveUserProfileToDb,
+  generateMedicareId,
   onPermissionWarning 
 } from './firebase';
 
@@ -89,8 +91,28 @@ export default function App() {
       setUser(currentUser);
       if (currentUser) {
         try {
-          const profile = await getUserProfileFromDb(currentUser.uid);
-          if (profile) setUserProfile(profile);
+          let profile = await getUserProfileFromDb(currentUser.uid);
+          // Give each account an ID exactly once. Future logins only read it;
+          // they never generate or overwrite a new Medicare ID.
+          if (!profile || !profile.medicareId) {
+            const firstProfile = {
+              ...(profile || {}),
+              name: profile?.name || currentUser.displayName || currentUser.email?.split('@')[0] || 'Medicare User',
+              email: currentUser.email || profile?.email || '',
+              photoURL: profile?.photoURL || currentUser.photoURL || null,
+              medicareId: profile?.medicareId || generateMedicareId(currentUser.uid),
+              createdAt: profile?.createdAt || new Date().toISOString()
+            };
+            await saveUserProfileToDb(currentUser.uid, firstProfile);
+            profile = firstProfile;
+          }
+          // Firebase Auth remains the source of truth for the Google avatar.
+          // Older profiles may have been saved before photoURL was available.
+          const resolvedProfile = {
+            ...(profile || {}),
+            photoURL: profile?.photoURL || currentUser.photoURL || null
+          };
+          setUserProfile(resolvedProfile);
         } catch (err) {
           console.warn("Failed to load user profile from cloud, using local:", err);
         }
@@ -174,7 +196,7 @@ export default function App() {
   const medicareId = userProfile?.medicareId || 'MED-PENDING';
 
   return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'} flex transition-colors duration-200 overflow-x-hidden`}>
+    <div className={`app-shell min-h-screen ${theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'theme-light bg-slate-100 text-slate-900'} flex transition-colors duration-200 overflow-x-hidden`}>
       {/* Desktop Collapsible Sidebar (Hidden on Mobile) */}
       <div className="hidden md:block">
         <Sidebar
@@ -197,7 +219,7 @@ export default function App() {
         }`}
       >
         {/* Top Navbar */}
-        <header className="sticky top-0 z-30 h-16 sm:h-18 backdrop-blur-xl bg-slate-950/90 border-b border-slate-800/80 px-4 sm:px-8 flex items-center justify-between">
+        <header className="sticky top-0 z-30 h-16 sm:h-[72px] backdrop-blur-2xl bg-[#091426]/85 border-b border-slate-700/50 px-4 sm:px-8 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,.12)]">
           {/* Left Side: Logo with Beating Heart on Mobile; Tab title on Desktop */}
           <div className="flex items-center gap-3">
             {/* Mobile Brand Logo with Animated Cardiac Beep */}
@@ -237,7 +259,7 @@ export default function App() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span className="text-slate-300 font-mono text-[11px]">ESP32 Link: Connected</span>
+              <span className="text-slate-300 font-mono text-[11px]">MEDICARE+ Link: Connected</span>
             </div>
 
             {/* Profile Dropdown Trigger */}
@@ -250,6 +272,8 @@ export default function App() {
                   <img
                     src={photoURL}
                     alt={displayName}
+                    referrerPolicy="no-referrer"
+                    onError={(event) => { event.currentTarget.style.display = 'none'; }}
                     className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover ring-2 ring-cyan-500/40"
                   />
                 ) : (
@@ -345,7 +369,7 @@ export default function App() {
         )}
 
         {/* Dynamic Page Views: Added pb-28 on mobile so content never overlaps with floating bottom bar */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-28 md:pb-12">
+        <main className="flex-1 p-4 sm:p-7 lg:p-10 max-w-[1440px] w-full mx-auto pb-28 md:pb-12">
           {activeTab === 'HOME' && (
             <HomePage 
               onNavigate={(tab) => setActiveTab(tab)} 
@@ -389,6 +413,7 @@ export default function App() {
               theme={theme}
               setTheme={setTheme}
               onLogout={handleLogout}
+              liveVitals={liveVitals}
             />
           )}
         </main>

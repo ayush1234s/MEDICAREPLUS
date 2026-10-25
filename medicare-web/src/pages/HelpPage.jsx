@@ -116,6 +116,11 @@ export default function HelpPage() {
         </p>
       </div>
 
+      <div className="rounded-2xl border border-cyan-500/25 bg-cyan-500/10 p-4 text-sm text-slate-300">
+        <p className="font-bold text-cyan-300">सरल हिंदी सहायता</p>
+        <p className="mt-1 text-xs leading-relaxed">ESP32 को Wi-Fi से जोड़ें, फिर वेबसाइट पर डेटा अपने-आप आएगा। दवा का समय सेट करने पर TFT पर अलार्म आएगा। SpO2 या दिल की धड़कन असामान्य लगे या कोई गंभीर लक्षण हों, तो तुरंत डॉक्टर से सलाह लें।</p>
+      </div>
+
       {/* HARDWARE BUTTONS & ARCHITECTURE INFOGRAPHIC */}
       <div className="glass-card rounded-3xl p-6 sm:p-8 border border-slate-800 space-y-6">
         <h3 className="text-lg font-bold text-white flex items-center gap-2">

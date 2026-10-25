@@ -18,9 +18,10 @@ import {
   IdCard
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import QRCode from 'qrcode';
 import { saveUserProfileToDb, generateMedicareId } from '../firebase';
 
-export default function ProfilePage({ user, userProfile, onProfileUpdated, theme, setTheme, onLogout }) {
+export default function ProfilePage({ user, userProfile, onProfileUpdated, theme, setTheme, onLogout, liveVitals }) {
   const [name, setName] = useState(userProfile?.name || user?.displayName || '');
   const [email] = useState(user?.email || '');
   const [dob, setDob] = useState(userProfile?.dob || '');
@@ -35,6 +36,10 @@ export default function ProfilePage({ user, userProfile, onProfileUpdated, theme
   // 7-day deletion state
   const [scheduledDeletion, setScheduledDeletion] = useState(userProfile?.deletionScheduledAt || null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [qrImage, setQrImage] = useState('');
+  const [section, setSection] = useState('profile');
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
@@ -123,6 +128,16 @@ export default function ProfilePage({ user, userProfile, onProfileUpdated, theme
   };
 
   const userPhoto = userProfile?.photoURL || user?.photoURL;
+  const profileComplete = Boolean(medicareId && name && dob && phone);
+  const qrDetails = `MEDICARE+ PATIENT DETAILS\nName: ${name}\nMedicare ID: ${medicareId}\nBlood Group: ${bloodGroup}\nSpO2: ${liveVitals?.spo2?.spo2 ?? 'No reading'}${liveVitals?.spo2?.spo2 ? '%' : ''}\nHeart Rate: ${liveVitals?.spo2?.bpm || liveVitals?.ecg?.bpm || 'No reading'}${liveVitals?.spo2?.bpm || liveVitals?.ecg?.bpm ? ' BPM' : ''}\nView portal: https://medicarepluss.vercel.app/`;
+
+  useEffect(() => {
+    if (profileComplete) {
+      QRCode.toDataURL(qrDetails, { width: 360, margin: 2, color: { dark: '#0f172a', light: '#ffffff' } }).then(setQrImage).catch(() => setQrImage(''));
+    }
+  }, [profileComplete, qrDetails]);
+
+  useEffect(() => setPhotoFailed(false), [userPhoto]);
 
   return (
     <div className="max-w-5xl mx-auto space-y-10 pb-16">
@@ -134,6 +149,11 @@ export default function ProfilePage({ user, userProfile, onProfileUpdated, theme
         <p className="text-slate-400 text-sm mt-1">
           Manage your personal patient credentials, system Medicare ID, and app preferences.
         </p>
+      </div>
+
+      <div className="inline-flex rounded-xl border border-slate-800 bg-slate-900 p-1">
+        <button onClick={() => setSection('profile')} className={`px-4 py-2 rounded-lg text-sm font-semibold ${section === 'profile' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400'}`}>Profile</button>
+        <button onClick={() => setSection('settings')} className={`px-4 py-2 rounded-lg text-sm font-semibold ${section === 'settings' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400'}`}>Settings</button>
       </div>
 
       {/* 7-Day Temporary Deletion Warning Banner if Active */}
@@ -182,10 +202,12 @@ export default function ProfilePage({ user, userProfile, onProfileUpdated, theme
 
             {/* Profile Photo & Name */}
             <div className="flex items-center gap-4 mb-6">
-              {userPhoto ? (
+              {userPhoto && !photoFailed ? (
                 <img
                   src={userPhoto}
                   alt={name}
+                  referrerPolicy="no-referrer"
+                  onError={() => setPhotoFailed(true)}
                   className="w-18 h-18 rounded-2xl object-cover ring-2 ring-cyan-400/50 shadow-md"
                 />
               ) : (
@@ -227,9 +249,9 @@ export default function ProfilePage({ user, userProfile, onProfileUpdated, theme
                 <p className="text-[10px] text-slate-500">DOB: {dob || 'Pending'}</p>
                 <p className="text-[10px] text-slate-500">Kit Link: ESP32-RTDB</p>
               </div>
-              <div className="p-1 rounded-lg bg-white/10 border border-white/20">
+              <button disabled={!profileComplete} onClick={() => setShowQr(true)} className="p-1 rounded-lg bg-white/10 border border-white/20 disabled:opacity-40" title={profileComplete ? 'Open your health QR' : 'Complete your profile to unlock QR'}>
                 <QrCode className="w-6 h-6 text-white" />
-              </div>
+              </button>
             </div>
           </div>
 
@@ -249,8 +271,9 @@ export default function ProfilePage({ user, userProfile, onProfileUpdated, theme
 
         {/* Right Column: Profile Form & Settings */}
         <div className="lg:col-span-2 space-y-8">
+          <div className="text-xs text-slate-400">{section === 'profile' ? 'Manage your patient details and Medicare identity.' : 'Manage display and account preferences.'}</div>
           {/* Profile Details Form */}
-          <div className="glass-card rounded-3xl p-6 sm:p-8 border border-slate-800">
+          <div className={`glass-card rounded-3xl p-6 sm:p-8 border border-slate-800 ${section === 'profile' ? '' : 'hidden'}`}>
             <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
               <User className="w-5 h-5 text-cyan-400" />
               Personal & Clinical Information
@@ -372,7 +395,7 @@ export default function ProfilePage({ user, userProfile, onProfileUpdated, theme
           </div>
 
           {/* Settings & Theme Section */}
-          <div className="glass-card rounded-3xl p-6 sm:p-8 border border-slate-800 space-y-6">
+          <div className={`glass-card rounded-3xl p-6 sm:p-8 border border-slate-800 space-y-6 ${section === 'settings' ? '' : 'hidden'}`}>
             <h3 className="text-lg font-bold text-white">App Settings & Customization</h3>
 
             {/* Theme Toggle */}
@@ -461,6 +484,17 @@ export default function ProfilePage({ user, userProfile, onProfileUpdated, theme
           </div>
         </div>
       </div>
+
+      {showQr && qrImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm" onClick={() => setShowQr(false)}>
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-black text-slate-900">MEDICARE+ Health QR</h3>
+            <p className="text-xs text-slate-500 mt-1">Scan to view this patient's identity and latest vital readings.</p>
+            <img src={qrImage} alt="Patient health QR" className="w-64 h-64 mx-auto my-5" />
+            <button onClick={() => setShowQr(false)} className="w-full rounded-xl bg-slate-900 py-2.5 text-sm font-bold text-white">Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

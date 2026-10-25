@@ -29,6 +29,18 @@ export default function ReportPage({ user, userProfile }) {
   const patientMedicareId = userProfile?.medicareId || 'MED-PATIENT-001';
   const patientGender = userProfile?.gender || 'Not specified';
   const patientDob = userProfile?.dob || 'Not specified';
+  const patientPhoto = userProfile?.photoURL || user?.photoURL || null;
+
+  const getClinicalGuidance = (scope) => {
+    const guidance = [];
+    if (scope === 'SPO2' || scope === 'BOTH') {
+      guidance.push('SpO2: 95–100% is generally expected at sea level. 91–94% should be discussed with a clinician if persistent. 90% or below requires urgent medical assessment.');
+    }
+    if (scope === 'ECG' || scope === 'BOTH') {
+      guidance.push('Resting adult heart rate: 60–100 BPM is generally expected. Below 60 BPM or above 100 BPM may need clinical review depending on symptoms, fitness, and medicines.');
+    }
+    return guidance;
+  };
 
   const handleGenerateReport = async (e) => {
     e.preventDefault();
@@ -78,7 +90,7 @@ export default function ReportPage({ user, userProfile }) {
     }
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!generatedReport) return;
 
     const doc = new jsPDF();
@@ -104,9 +116,9 @@ export default function ReportPage({ user, userProfile }) {
 
     // 2. Patient Credentials Box
     doc.setFillColor(248, 250, 252);
-    doc.roundedRect(14, 42, 182, 32, 2, 2, 'F');
+    doc.roundedRect(14, 42, 182, 38, 2, 2, 'F');
     doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, 42, 182, 32, 2, 2, 'S');
+    doc.roundedRect(14, 42, 182, 38, 2, 2, 'S');
 
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(10);
@@ -121,20 +133,35 @@ export default function ReportPage({ user, userProfile }) {
     doc.text(`Gender: ${patientGender}`, 110, 58);
     doc.text(`Date of Birth: ${patientDob}`, 110, 66);
 
+    if (patientPhoto) {
+      try {
+        const response = await fetch(patientPhoto);
+        const imageBlob = await response.blob();
+        const imageData = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(imageBlob);
+        });
+        doc.addImage(imageData, 'JPEG', 171, 47, 18, 18);
+      } catch {
+        // A Google avatar can be CORS-protected; the report still exports.
+      }
+    }
+
     // 3. Clinical Summary Banner
     doc.setFillColor(241, 245, 249);
-    doc.rect(14, 80, 182, 22, 'F');
+    doc.rect(14, 86, 182, 22, 'F');
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(15, 23, 42);
-    doc.text(`Test Scope: ${generatedReport.selectedTest}`, 20, 88);
-    doc.text(`Date Range: ${generatedReport.fromDate} to ${generatedReport.toDate}`, 20, 96);
+    doc.text(`Test Scope: ${generatedReport.selectedTest}`, 20, 94);
+    doc.text(`Date Range: ${generatedReport.fromDate} to ${generatedReport.toDate}`, 20, 102);
 
     doc.setTextColor(14, 116, 144);
-    doc.text(`Avg SpO2: ${generatedReport.summary.avgSpo2}${generatedReport.summary.avgSpo2 !== 'N/A' ? '%' : ''}`, 110, 88);
-    doc.text(`Avg Pulse: ${generatedReport.summary.avgBpm} BPM`, 150, 88);
-    doc.text(`Total Observations: ${generatedReport.summary.totalRecords}`, 110, 96);
+    if (generatedReport.selectedTest !== 'ECG') doc.text(`Avg SpO2: ${generatedReport.summary.avgSpo2}${generatedReport.summary.avgSpo2 !== 'N/A' ? '%' : ''}`, 110, 94);
+    if (generatedReport.selectedTest !== 'SPO2') doc.text(`Avg Pulse: ${generatedReport.summary.avgBpm} BPM`, 150, 94);
+    doc.text(`Total Observations: ${generatedReport.summary.totalRecords}`, 110, 102);
 
     // 4. Clinical Observations Table
     const tableHeaders = [['#', 'Date', 'Time', 'Test Type', 'Reading', 'Pulse / BPM', 'Diagnosis Status']];
@@ -154,7 +181,7 @@ export default function ReportPage({ user, userProfile }) {
     }
 
     autoTable(doc, {
-      startY: 108,
+      startY: 114,
       head: tableHeaders,
       body: tableRows,
       theme: 'grid',
@@ -175,9 +202,18 @@ export default function ReportPage({ user, userProfile }) {
     });
 
     // 5. Clinical Remarks & Signature Footer
-    const finalY = doc.lastAutoTable.finalY + 15;
+    let finalY = doc.lastAutoTable.finalY + 12;
     
-    if (finalY < 260) {
+    const guidance = getClinicalGuidance(generatedReport.selectedTest);
+    const advisoryEnglish = 'This report is for general wellness monitoring and is not a medical diagnosis. If you have severe symptoms or believe you may have a serious condition, please seek medical care from a doctor immediately.';
+    // jsPDF's default Helvetica font cannot render Devanagari. Roman Hindi
+    // preserves the meaning without producing corrupted glyphs in the PDF.
+    const advisoryHindi = 'Hindi: Yeh report sirf general health monitoring ke liye hai, diagnosis ke liye nahi. Agar koi serious lakshan ho, to turant doctor se sampark karein.';
+    if (finalY > 235) {
+      doc.addPage();
+      finalY = 20;
+    }
+    {
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(71, 85, 105);
@@ -185,13 +221,32 @@ export default function ReportPage({ user, userProfile }) {
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      doc.text(generatedReport.notes || 'No adverse arrhythmia or acute desaturations noted during monitored period.', 14, finalY + 6, { maxWidth: 180 });
-
-      // Signature lines
-      doc.setDrawColor(203, 213, 225);
-      doc.line(130, finalY + 28, 190, finalY + 28);
-      doc.text('Authorized Clinical Officer', 135, finalY + 34);
+      doc.text(generatedReport.notes || 'No additional clinical remarks provided.', 14, finalY + 6, { maxWidth: 180 });
+      finalY += 18;
+      doc.setFont('helvetica', 'bold');
+      doc.text('REFERENCE RANGES FOR THIS REPORT:', 14, finalY);
+      doc.setFont('helvetica', 'normal');
+      guidance.forEach((line, index) => doc.text(line, 14, finalY + 6 + index * 10, { maxWidth: 178 }));
+      finalY += 10 + guidance.length * 10;
+      doc.setFillColor(255, 247, 237);
+      doc.roundedRect(14, finalY, 182, 28, 2, 2, 'F');
+      doc.setTextColor(154, 52, 18);
+      doc.setFontSize(7.5);
+      doc.text(advisoryEnglish, 18, finalY + 7, { maxWidth: 174 });
+      doc.text(advisoryHindi, 18, finalY + 18, { maxWidth: 174 });
     }
+
+    // Official stamp at the lower-right of the exported report.
+    const pageCount = doc.getNumberOfPages();
+    doc.setPage(pageCount);
+    doc.setDrawColor(14, 116, 144);
+    doc.setTextColor(14, 116, 144);
+    doc.roundedRect(160, 270, 35, 14, 2, 2, 'S');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text('MEDICARE+', 165, 277);
+    doc.setFont('helvetica', 'normal');
+    doc.text('VERIFIED REPORT', 163, 281);
 
     // Save PDF file to user's device
     const fileName = `MEDICARE_Report_${patientName.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
