@@ -1,0 +1,19 @@
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+MediCareWiFiSecrets.h
+MediCareSecrets.h
+*.local
+
+# Node & web build
+node_modules/
+dist/
+dist-ssr/
+*.log
+
+# Arduino / ESP32 builds
+build/
+.pio/
+.vscode/
+.DS_Store

@@ -11,7 +11,6 @@
 // ============================================================================
 
 static const char* FIREBASE_BASE_URL = "https://medicare-plus-74a1a-default-rtdb.firebaseio.com";
-static const char* FIREBASE_AUTH_KEY = "AIzaSyCfv8pOjCMn_-kVVWMTRDNXJL5MtAdq6fw";
 
 // Global functions & variables from main sketch
 extern bool reminderOnScreen;

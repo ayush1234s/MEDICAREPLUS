@@ -26,14 +26,14 @@ import {
 } from "firebase/database";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCfv8pOjCMn_-kVVWMTRDNXJL5MtAdq6fw",
-  authDomain: "medicare-plus-74a1a.firebaseapp.com",
-  databaseURL: "https://medicare-plus-74a1a-default-rtdb.firebaseio.com",
-  projectId: "medicare-plus-74a1a",
-  storageBucket: "medicare-plus-74a1a.firebasestorage.app",
-  messagingSenderId: "1045861645182",
-  appId: "1:1045861645182:web:f3ff7fafc2c92b4472d12f",
-  measurementId: "G-XS8VF7BTB6"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
