@@ -172,8 +172,28 @@ inline bool uploadECGToFirebase(int bpm, const String &rhythm = "Normal Sinus Rh
 }
 
 // ----------------------------------------------------------------------------
-// 3. Poll Active Medicine Reminder from Firebase (Instant Alert on Device!)
+// 3. Poll Active Medicine Reminder from Firebase
 // ----------------------------------------------------------------------------
+inline bool isMedicineReminderDue(const String &scheduledDate, const String &scheduledTime) {
+  // Older reminders without a schedule are delivered immediately.
+  if (scheduledDate.length() == 0 || scheduledTime.length() == 0) return true;
+
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo, 100)) {
+    Serial.println("[Firebase] Reminder queued: waiting for NTP clock sync.");
+    return false;
+  }
+
+  char currentDate[16];
+  char currentTime[16];
+  strftime(currentDate, sizeof(currentDate), "%Y-%m-%d", &timeinfo);
+  strftime(currentTime, sizeof(currentTime), "%H:%M", &timeinfo);
+
+  String currentKey = String(currentDate) + " " + String(currentTime);
+  String scheduledKey = scheduledDate + " " + scheduledTime;
+  return currentKey >= scheduledKey;
+}
+
 inline void checkFirebaseMedicineReminders() {
   if (WiFi.status() != WL_CONNECTED) return;
   if (reminderOnScreen) return; // Already showing on TFT
@@ -197,7 +217,7 @@ inline void checkFirebaseMedicineReminders() {
       String activeStr = getJsonValue(payload, "active");
       String statusStr = getJsonValue(payload, "status");
 
-      // Whenever active is true and status is Pending, TRIGGER IMMEDIATELY!
+      // Alert only once the medication's selected local date and time has arrived.
       if ((activeStr.equalsIgnoreCase("true") || activeStr == "1") && 
           (statusStr.equalsIgnoreCase("Pending") || statusStr.length() == 0)) {
         
@@ -207,6 +227,11 @@ inline void checkFirebaseMedicineReminders() {
         String dose = getJsonValue(payload, "dosage");
         String sDate = getJsonValue(payload, "scheduledDate");
         String sTime = getJsonValue(payload, "scheduledTime");
+
+        if (!isMedicineReminderDue(sDate, sTime)) {
+          http.end();
+          return;
+        }
 
         if (patient.length() == 0) patient = "Patient";
         if (dose.length() == 0) dose = "1 Dose";
@@ -226,6 +251,10 @@ inline void checkFirebaseMedicineReminders() {
         showMedicineReminderTFT(patient, activeReminderName, dose, sDate, sTime, false);
       }
     }
+  } else {
+    // This is the key diagnostic for a missing TFT alert. HTTP 401/403 means
+    // the Realtime Database rules do not permit the ESP32 REST read.
+    Serial.printf("[Firebase] Reminder poll failed (HTTP %d). Check WiFi and RTDB read rules for /active_reminder.\n", httpCode);
   }
   http.end();
 }

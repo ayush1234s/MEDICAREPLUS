@@ -212,7 +212,11 @@ export const addMedicineToDb = async (medicineData) => {
       scheduledDate: medicineData.date,
       scheduledTime: medicineData.time,
       timestamp: Date.now(),
-      status: 'Pending'
+      status: 'Pending',
+      delivery: 'queued',
+      // The ESP32 uses these local date/time fields to show the alarm at the
+      // selected time, rather than immediately when the form is submitted.
+      triggerAt: `${medicineData.date}T${medicineData.time}:00`
     });
 
     return newMedRef.key;

@@ -129,7 +129,7 @@ export default function MedicinePage({ user, userProfile, medicines = [] }) {
               Schedule New Medication
             </h3>
             <p className="text-xs text-slate-400 mb-6">
-              Enter dosage specifications. Once scheduled, the alarm profile is broadcast to the hardware kit.
+              The ESP32 checks Firebase every few seconds and shows the TFT alarm at the selected date and time.
             </p>
 
             <form onSubmit={handleAddMedicine} className="space-y-5">

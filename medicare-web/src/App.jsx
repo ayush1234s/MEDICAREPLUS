@@ -351,6 +351,8 @@ export default function App() {
               onNavigate={(tab) => setActiveTab(tab)} 
               liveVitals={liveVitals} 
               medicines={medicines} 
+              user={user}
+              userProfile={userProfile}
             />
           )}
 

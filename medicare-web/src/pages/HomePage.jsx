@@ -19,8 +19,11 @@ import {
   ShieldAlert
 } from 'lucide-react';
 
-export default function HomePage({ onNavigate, liveVitals, medicines = [] }) {
+export default function HomePage({ onNavigate, liveVitals, medicines = [], user, userProfile }) {
   const pendingMedicinesCount = medicines.filter(m => m.status === 'Pending').length;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Night';
+  const patientName = userProfile?.name || user?.displayName || user?.email?.split('@')[0] || 'Patient';
 
   return (
     <div className="space-y-16 pb-16">
@@ -31,6 +34,9 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [] }) {
         <div className="absolute inset-0 bg-ecg-grid opacity-25 pointer-events-none" />
 
         <div className="relative z-10 max-w-4xl">
+          <p className="text-sm sm:text-base font-semibold text-cyan-300 mb-3">
+            {greeting}, <span className="text-white">{patientName}</span>
+          </p>
           {/* Live Device Pill */}
           <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 text-xs font-semibold mb-6 shadow-sm">
             <span className="relative flex h-2 w-2">
