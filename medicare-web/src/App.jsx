@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { 
   auth, 
@@ -16,11 +16,11 @@ import AuthScreen from './components/AuthScreen';
 import Sidebar from './components/Sidebar';
 
 import HomePage from './pages/HomePage';
-import TestPage from './pages/TestPage';
-import ReportPage from './pages/ReportPage';
-import MedicinePage from './pages/MedicinePage';
-import HelpPage from './pages/HelpPage';
-import ProfilePage from './pages/ProfilePage';
+const TestPage = lazy(() => import('./pages/TestPage'));
+const ReportPage = lazy(() => import('./pages/ReportPage'));
+const MedicinePage = lazy(() => import('./pages/MedicinePage'));
+const HelpPage = lazy(() => import('./pages/HelpPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
 import { 
   Home,
@@ -29,13 +29,6 @@ import {
   Pill,
   HelpCircle,
   Heart, 
-  Wifi, 
-  Moon, 
-  Sun, 
-  Menu, 
-  Bell, 
-  ShieldCheck,
-  IdCard,
   User,
   AlertTriangle,
   Copy,
@@ -370,52 +363,45 @@ export default function App() {
 
         {/* Dynamic Page Views: Added pb-28 on mobile so content never overlaps with floating bottom bar */}
         <main className="flex-1 p-4 sm:p-7 lg:p-10 max-w-[1440px] w-full mx-auto pb-28 md:pb-12">
-          {activeTab === 'HOME' && (
-            <HomePage 
-              onNavigate={(tab) => setActiveTab(tab)} 
-              liveVitals={liveVitals} 
-              medicines={medicines} 
-              user={user}
-              userProfile={userProfile}
-            />
-          )}
+          <Suspense fallback={(
+            <div className="flex min-h-48 items-center justify-center" role="status" aria-label="Loading page">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-400 border-t-transparent" />
+            </div>
+          )}>
+            {activeTab === 'HOME' && (
+              <HomePage
+                onNavigate={(tab) => setActiveTab(tab)}
+                liveVitals={liveVitals}
+                medicines={medicines}
+                user={user}
+                userProfile={userProfile}
+              />
+            )}
 
-          {activeTab === 'TEST' && (
-            <TestPage 
-              liveVitals={liveVitals} 
-            />
-          )}
+            {activeTab === 'TEST' && <TestPage liveVitals={liveVitals} />}
 
-          {activeTab === 'REPORT' && (
-            <ReportPage 
-              user={user} 
-              userProfile={userProfile} 
-            />
-          )}
+            {activeTab === 'REPORT' && (
+              <ReportPage user={user} userProfile={userProfile} />
+            )}
 
-          {activeTab === 'MEDICINE' && (
-            <MedicinePage 
-              user={user} 
-              userProfile={userProfile} 
-              medicines={medicines} 
-            />
-          )}
+            {activeTab === 'MEDICINE' && (
+              <MedicinePage user={user} userProfile={userProfile} medicines={medicines} />
+            )}
 
-          {activeTab === 'HELP' && (
-            <HelpPage />
-          )}
+            {activeTab === 'HELP' && <HelpPage />}
 
-          {activeTab === 'PROFILE' && (
-            <ProfilePage 
-              user={user} 
-              userProfile={userProfile} 
-              onProfileUpdated={(updated) => setUserProfile(updated)}
-              theme={theme}
-              setTheme={setTheme}
-              onLogout={handleLogout}
-              liveVitals={liveVitals}
-            />
-          )}
+            {activeTab === 'PROFILE' && (
+              <ProfilePage
+                user={user}
+                userProfile={userProfile}
+                onProfileUpdated={(updated) => setUserProfile(updated)}
+                theme={theme}
+                setTheme={setTheme}
+                onLogout={handleLogout}
+                liveVitals={liveVitals}
+              />
+            )}
+          </Suspense>
         </main>
       </div>
 

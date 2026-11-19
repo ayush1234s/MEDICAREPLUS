@@ -1,25 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Activity, 
   Heart, 
   Pill, 
   FileText, 
-  Cpu, 
-  Wifi, 
-  ShieldCheck, 
-  Sparkles, 
+  Wifi,
   ArrowRight, 
   CheckCircle, 
-  Clock, 
-  Smartphone, 
-  Sliders, 
-  HelpCircle,
-  ExternalLink,
-  AlertTriangle,
   ShieldAlert
 } from 'lucide-react';
 
 export default function HomePage({ onNavigate, liveVitals, medicines = [], user, userProfile }) {
+  const [advisoryLanguage, setAdvisoryLanguage] = useState('en');
   const pendingMedicinesCount = medicines.filter(m => m.status === 'Pending').length;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Night';
@@ -280,19 +272,47 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold text-rose-400 uppercase tracking-widest px-2 py-0.5 rounded bg-rose-500/20 border border-rose-500/30">
-                CRITICAL HEALTH ADVISORY
+                {advisoryLanguage === 'en' ? 'CRITICAL HEALTH ADVISORY' : 'ज़रूरी स्वास्थ्य सूचना'}
               </span>
-              <span className="text-xs text-slate-400 font-semibold">Important Medical Notice</span>
+              <span className="text-xs text-slate-400 font-semibold">
+                {advisoryLanguage === 'en' ? 'Important Medical Notice' : 'महत्वपूर्ण मेडिकल सूचना'}
+              </span>
+              <div className="sm:ml-auto inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-950/70 p-1" aria-label="Advisory language">
+                <button
+                  type="button"
+                  onClick={() => setAdvisoryLanguage('en')}
+                  aria-pressed={advisoryLanguage === 'en'}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${advisoryLanguage === 'en' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  English
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdvisoryLanguage('hi')}
+                  aria-pressed={advisoryLanguage === 'hi'}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${advisoryLanguage === 'hi' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  हिन्दी
+                </button>
+              </div>
             </div>
 
             <h3 className="text-lg font-black text-white">
-              Medical Disclaimer & Emergency Care Warning
+              {advisoryLanguage === 'en' ? 'Medical Disclaimer & Emergency Care Warning' : 'मेडिकल सलाह और आपातकालीन चेतावनी'}
             </h3>
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              <strong className="text-rose-300">In Any Critical Condition Please Go To Doctors, Do Not Use This Device.</strong> This device is designed for <em>daily general wellness purposes</em> to check your Oxygen Saturation (SpO2), Resting Heart Rate, and preliminary ECG wave patterns. <strong>MEDICARE+ does not suggest relying solely on this record in acute or critical medical emergencies.</strong> Certified doctors and emergency hospitals have advanced, clinical-grade medical instruments. If you experience shortness of breath, chest pain, or severe symptoms, please seek immediate emergency medical attention.
+              {advisoryLanguage === 'en' ? (
+                <>
+                  <strong className="text-rose-300">In any critical condition, go to a doctor. Do not use this device.</strong> This device is for <em>daily general wellness checks</em>, such as oxygen level (SpO2), resting heart rate, and basic ECG wave patterns. <strong>Do not rely only on this device during a medical emergency.</strong> Doctors and hospitals use advanced medical equipment. If you have trouble breathing, chest pain, or severe symptoms, get emergency medical help right away.
+                </>
+              ) : (
+                <>
+                  <strong className="text-rose-300">गंभीर हालत में इस डिवाइस का उपयोग न करें। तुरंत डॉक्टर या अस्पताल जाएँ।</strong> यह डिवाइस रोज़मर्रा की सेहत की सामान्य जाँच के लिए है। इससे ऑक्सीजन का स्तर (SpO2), आराम की स्थिति में हृदय गति और शुरुआती ECG तरंगें देखी जा सकती हैं। <strong>आपात स्थिति में केवल इस डिवाइस की रीडिंग पर भरोसा न करें।</strong> साँस लेने में तकलीफ़, सीने में दर्द या गंभीर लक्षण हों, तो तुरंत आपात चिकित्सा सहायता लें।
+                </>
+              )}
             </p>
           </div>
         </div>

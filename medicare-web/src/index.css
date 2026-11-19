@@ -190,3 +190,259 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(56, 189, 248, 0.5);
 }
+
+/* Shared portal polish: keep surfaces crisp and inexpensive to paint. */
+:root {
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+  --portal-accent: #20b8a8;
+}
+
+html { min-width: 320px; scroll-behavior: smooth; }
+body { min-width: 320px; margin: 0; }
+button, input, select, textarea { font: inherit; }
+button { touch-action: manipulation; }
+button:focus-visible, a:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgba(45, 212, 191, .72);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  background: #07111f;
+  color: #e7edf6;
+}
+.app-shell > div.flex-1 { min-height: 100vh; }
+.app-shell header {
+  background: #0d1a2b !important;
+  border-color: rgba(148,163,184,.16) !important;
+  box-shadow: 0 1px 8px rgba(0,0,0,.12) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.app-shell header .text-white { color: #f8fafc !important; }
+.app-shell .glass-card,
+.app-shell .glass-panel,
+.app-shell .glass-card-hover {
+  background: #101e30;
+  border: 1px solid rgba(148,163,184,.16);
+  box-shadow: 0 2px 8px rgba(0,0,0,.14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.app-shell .glass-card-hover:hover,
+.app-shell .glass-card:hover {
+  transform: none;
+  border-color: rgba(45,212,191,.38);
+  box-shadow: 0 5px 14px rgba(0,0,0,.2);
+}
+.app-shell main > * { animation: none; }
+.app-shell input, .app-shell textarea, .app-shell select {
+  min-height: 44px;
+  border-radius: 12px;
+}
+.app-shell button { min-height: 40px; }
+.app-shell .animate-heartbeat,
+.app-shell .animate-pulse-glow { animation-duration: 2.4s; }
+
+.theme-light { color-scheme: light; }
+.theme-light.app-shell { background: #f3f7f8; color: #152b39; }
+.theme-light.app-shell header { background: rgba(255,255,255,.97) !important; }
+.theme-light.app-shell header .text-white { color: #142d3b !important; }
+
+@media (max-width: 767px) {
+  html { scroll-behavior: auto; }
+  .app-shell > div.flex-1 { min-height: 100svh; }
+  .app-shell main { padding: 1rem !important; }
+  .app-shell main > * { max-width: 100%; }
+  .app-shell main h1 { font-size: clamp(1.65rem, 7vw, 2.25rem); line-height: 1.12; }
+  .app-shell main .space-y-12 { row-gap: 1.75rem; }
+  .app-shell main .space-y-10 { row-gap: 1.5rem; }
+  .app-shell main .space-y-8 { row-gap: 1.25rem; }
+  .app-shell main .rounded-3xl { border-radius: 1.25rem; }
+  .app-shell main table { min-width: 620px; }
+  .app-shell main form { min-width: 0; }
+  .app-shell main form > div { min-width: 0; }
+  .app-shell input, .app-shell textarea, .app-shell select { font-size: 16px; }
+}
+
+@media (max-width: 420px) {
+  .app-shell header { padding-inline: .75rem !important; }
+  .app-shell main { padding: .75rem !important; }
+  .app-shell main .p-8, .app-shell main .sm\:p-8 { padding: 1rem; }
+  .app-shell main .p-6 { padding: 1rem; }
+  .app-shell main button { max-width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* Consistent modern clinical dashboard details across every portal page. */
+.app-shell {
+  background-image:
+    radial-gradient(ellipse at 78% 0%, rgba(20,184,166,.10), transparent 34rem),
+    linear-gradient(145deg, #07111f 0%, #091727 54%, #081321 100%);
+  background-attachment: fixed;
+}
+.app-shell main { isolation: isolate; }
+.app-shell main h1 { letter-spacing: -.035em; }
+.app-shell main h2, .app-shell main h3 { letter-spacing: -.02em; }
+.app-shell main .glass-card {
+  position: relative;
+  overflow: hidden;
+}
+.app-shell main .glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 1.25rem;
+  width: 2.5rem;
+  height: 2px;
+  background: linear-gradient(90deg, #2dd4bf, rgba(45,212,191,0));
+  opacity: .65;
+  pointer-events: none;
+}
+.app-shell main [class*="bg-slate-950"] {
+  background-color: #0a1625;
+}
+.app-shell main [class*="bg-slate-900"] {
+  background-color: #111f31;
+}
+.app-shell main table { border-collapse: separate; border-spacing: 0; }
+.app-shell main th {
+  color: #9fb2c6;
+  font-size: .68rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.app-shell main th, .app-shell main td { padding: .85rem 1rem; }
+.app-shell main tr > * { border-bottom: 1px solid rgba(148,163,184,.12); }
+.app-shell main tbody tr:hover { background: rgba(45,212,191,.045); }
+.app-shell main input, .app-shell main textarea, .app-shell main select {
+  color: #edf5fb;
+  background-color: #0a1625;
+  border-color: #26384b;
+}
+.app-shell main input::placeholder, .app-shell main textarea::placeholder { color: #7d90a4; }
+.app-shell main button:not(:disabled):hover { filter: brightness(1.08); }
+.app-shell main button:disabled { cursor: not-allowed; }
+.app-shell aside {
+  background: #0a1625 !important;
+  border-color: rgba(148,163,184,.14) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 8px 0 28px rgba(0,0,0,.2) !important;
+}
+.app-shell aside nav button { min-height: 54px; border-radius: 14px; }
+.app-shell aside nav button[class*="bg-gradient"] {
+  background: linear-gradient(100deg, rgba(20,184,166,.2), rgba(14,165,233,.08)) !important;
+  border-color: rgba(45,212,191,.27) !important;
+}
+#root > nav.fixed {
+  background: #0b1929 !important;
+  border-color: rgba(148,163,184,.22) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,.35) !important;
+}
+#root > nav.fixed button { min-width: 46px; min-height: 46px; }
+
+/* Sign-in and registration use the same visual system as the dashboard. */
+#root > div[class*="h-[100dvh]"] {
+  background:
+    radial-gradient(ellipse at 78% 18%, rgba(20,184,166,.14), transparent 32rem),
+    linear-gradient(145deg, #07111f, #0b1c2d 58%, #07111f) !important;
+}
+#root > div[class*="h-[100dvh]"] > div:last-child > div {
+  background: #101e30 !important;
+  border-color: rgba(148,163,184,.2) !important;
+  box-shadow: 0 24px 64px rgba(0,0,0,.34) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+#root > div[class*="h-[100dvh]"] .glass-card {
+  background: #0d1a2b;
+  border-color: rgba(148,163,184,.16);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+#root > div[class*="h-[100dvh]"] input {
+  min-height: 46px;
+  background: #0a1625;
+}
+
+@media (max-width: 767px) {
+  .app-shell { background-attachment: scroll; }
+  .app-shell main { padding-top: 1.15rem !important; }
+  .app-shell main .glass-card::before { left: 1rem; }
+  .app-shell main th, .app-shell main td { padding: .7rem .75rem; }
+  .app-shell main .grid-cols-2 > * { min-width: 0; }
+  #root > nav.fixed { bottom: max(.75rem, env(safe-area-inset-bottom)) !important; }
+  #root > div[class*="h-[100dvh]"] { min-height: 100svh; height: auto; }
+  #root > div[class*="h-[100dvh]"] > div:last-child { padding: 1rem; }
+}
+
+@media (max-width: 380px) {
+  #root > nav.fixed { left: .5rem !important; right: .5rem !important; padding-inline: .35rem !important; }
+  #root > nav.fixed button { min-width: 42px; padding-inline: .55rem; }
+}
+
+/* Blue-violet color grade with brighter gradient accents. */
+:root {
+  --portal-accent: #818cf8;
+  --portal-accent-bright: #a78bfa;
+  --portal-highlight: #22d3ee;
+  --portal-pink: #f472b6;
+}
+.app-shell {
+  background-image:
+    radial-gradient(ellipse at 82% 0%, rgba(99,102,241,.17), transparent 34rem),
+    radial-gradient(ellipse at 4% 78%, rgba(217,70,239,.07), transparent 28rem),
+    linear-gradient(145deg, #080d1b 0%, #0d1429 52%, #091222 100%);
+}
+.app-shell .glass-card { border-color: rgba(129,140,248,.18); }
+.app-shell .glass-card::before {
+  background: linear-gradient(90deg, #818cf8, #22d3ee, rgba(34,211,238,0));
+  width: 4rem;
+}
+.app-shell .glass-card:hover,
+.app-shell .glass-card-hover:hover { border-color: rgba(129,140,248,.42); }
+.app-shell main [class*="text-cyan-"] { color: #67e8f9 !important; }
+.app-shell main [class*="text-teal-"] { color: #a5b4fc !important; }
+.app-shell main [class*="border-cyan-"] { border-color: rgba(103,232,249,.3) !important; }
+.app-shell main [class*="bg-cyan-"] { background-color: rgba(34,211,238,.12) !important; }
+.app-shell main [class*="bg-teal-"] { background-color: rgba(129,140,248,.13) !important; }
+.app-shell main [class*="shadow-cyan-"] { --tw-shadow-color: rgba(99,102,241,.25); }
+.app-shell aside nav button[class*="bg-gradient"] {
+  background: linear-gradient(105deg, rgba(99,102,241,.27), rgba(34,211,238,.1)) !important;
+  border-color: rgba(129,140,248,.38) !important;
+}
+.app-shell main button[class*="from-cyan-"] {
+  background-image: linear-gradient(110deg, #6366f1, #8b5cf6 55%, #06b6d4) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 24px rgba(99,102,241,.25);
+}
+.app-shell main h1 [class*="text-cyan-"] { color: #67e8f9 !important; }
+.app-shell header .text-cyan-400 { color: #a5b4fc !important; }
+#root > nav.fixed button[class*="bg-gradient"] {
+  background: linear-gradient(135deg, rgba(99,102,241,.27), rgba(34,211,238,.14)) !important;
+  border-color: rgba(129,140,248,.42) !important;
+  box-shadow: 0 5px 16px rgba(99,102,241,.18) !important;
+}
+#root > div[class*="h-[100dvh]"] {
+  background:
+    radial-gradient(ellipse at 76% 16%, rgba(99,102,241,.2), transparent 34rem),
+    radial-gradient(ellipse at 10% 88%, rgba(217,70,239,.08), transparent 28rem),
+    linear-gradient(145deg, #080d1b, #10172f 58%, #081222) !important;
+}
+#root > div[class*="h-[100dvh]"] .text-cyan-400 { color: #a5b4fc !important; }
+#root > div[class*="h-[100dvh]"] .bg-gradient-to-r {
+  background-image: linear-gradient(100deg, #818cf8, #22d3ee, #f472b6);
+}

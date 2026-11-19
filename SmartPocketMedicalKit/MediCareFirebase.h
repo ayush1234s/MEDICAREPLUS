@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <time.h>
+#include "MediCareRTOS.h"
 
 // ============================================================================
 // MEDICARE+ FIREBASE REALTIME DATABASE CLOUD BRIDGE
@@ -80,9 +81,19 @@ inline String getJsonValue(const String &json, const String &key) {
 // ----------------------------------------------------------------------------
 // 1. Upload SpO2 & Heart Rate Measurement to Firebase
 // ----------------------------------------------------------------------------
-inline bool uploadSpO2ToFirebase(int spo2, int bpm) {
+inline bool uploadSpO2ToFirebase(int spo2, int bpm,
+                                 const String &recordDate = "",
+                                 const String &recordTime = "") {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[Firebase] WiFi NOT connected! Please check WIFI_SSID in SmartPocketMedicalKit.ino");
+    Serial.println("[Firebase] WiFi NOT connected! Enqueueing SpO2 measurement for offline sync.");
+    String dateStr, timeStr;
+    if (recordDate.length() && recordTime.length()) {
+      dateStr = recordDate;
+      timeStr = recordTime;
+    } else {
+      getDeviceDateTime(dateStr, timeStr);
+    }
+    rtosEnqueueOfflineReading(spo2, bpm, dateStr.c_str(), timeStr.c_str(), spo2 >= 95, false);
     return false;
   }
 
@@ -91,8 +102,8 @@ inline bool uploadSpO2ToFirebase(int spo2, int bpm) {
   client.setTimeout(6);
 
   HTTPClient http;
-  String dateStr, timeStr;
-  getDeviceDateTime(dateStr, timeStr);
+  String dateStr = recordDate, timeStr = recordTime;
+  if (!dateStr.length() || !timeStr.length()) getDeviceDateTime(dateStr, timeStr);
 
   String jsonPayload = "{";
   jsonPayload += "\"spo2\":" + String(spo2) + ",";
@@ -127,9 +138,19 @@ inline bool uploadSpO2ToFirebase(int spo2, int bpm) {
 // ----------------------------------------------------------------------------
 // 2. Upload ECG & Heart Rate Measurement to Firebase
 // ----------------------------------------------------------------------------
-inline bool uploadECGToFirebase(int bpm, const String &rhythm = "Normal Sinus Rhythm") {
+inline bool uploadECGToFirebase(int bpm, const String &rhythm = "Normal Sinus Rhythm",
+                                const String &recordDate = "",
+                                const String &recordTime = "") {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[Firebase] WiFi NOT connected! Cannot upload ECG.");
+    Serial.println("[Firebase] WiFi NOT connected! Enqueueing ECG measurement for offline sync.");
+    String dateStr, timeStr;
+    if (recordDate.length() && recordTime.length()) {
+      dateStr = recordDate;
+      timeStr = recordTime;
+    } else {
+      getDeviceDateTime(dateStr, timeStr);
+    }
+    rtosEnqueueOfflineReading(0, bpm, dateStr.c_str(), timeStr.c_str(), true, true);
     return false;
   }
 
@@ -138,8 +159,8 @@ inline bool uploadECGToFirebase(int bpm, const String &rhythm = "Normal Sinus Rh
   client.setTimeout(6);
 
   HTTPClient http;
-  String dateStr, timeStr;
-  getDeviceDateTime(dateStr, timeStr);
+  String dateStr = recordDate, timeStr = recordTime;
+  if (!dateStr.length() || !timeStr.length()) getDeviceDateTime(dateStr, timeStr);
 
   String jsonPayload = "{";
   jsonPayload += "\"bpm\":" + String(bpm) + ",";

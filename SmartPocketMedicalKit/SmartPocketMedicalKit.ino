@@ -17,6 +17,22 @@
 #include "MediCareDashboard.h"
 #include "MediCareFirebase.h"
 #include "MediCareQrCode.h"
+#include "MediCareWiFiManager.h"
+#include "MediCareWiFiPortal.h"
+#include "MediCareRTOS.h"
+
+// Wrapper functions for FreeRTOS Firebase synchronization task
+bool syncSpO2Reading(const OfflineReading &reading) {
+  return uploadSpO2ToFirebase(reading.spo2, reading.bpm,
+                              String(reading.dateStr), String(reading.timeStr));
+}
+bool syncECGReading(const OfflineReading &reading) {
+  return uploadECGToFirebase(reading.bpm, "Normal Sinus Rhythm",
+                             String(reading.dateStr), String(reading.timeStr));
+}
+void pollFirebaseReminders() {
+  checkFirebaseMedicineReminders();
+}
 
 #ifndef MEDICINE_REMINDER_TEST_MODE
 #define MEDICINE_REMINDER_TEST_MODE false
@@ -1332,18 +1348,7 @@ void startWiFi()
 
 {
 
-  WiFi.mode(WIFI_STA);
-
-  WiFi.setAutoReconnect(true);
-
-  WiFi.begin(
-
-    WIFI_SSID,
-
-    WIFI_PASSWORD
-
-  );
-
+  wifiManagerStartSTA();
   lastWiFiAttempt = millis();
 }
 
@@ -1357,92 +1362,7 @@ void updateWiFi()
 
 {
 
-  wl_status_t status =
-
-    WiFi.status();
-
-  if (status == WL_CONNECTED)
-
-  {
-
-    if (!wifiConnected)
-
-    {
-
-      wifiConnected = true;
-
-      // India timezone UTC +5:30
-
-      configTime(
-
-        19800,
-
-        0,
-
-        "pool.ntp.org",
-
-        "time.nist.gov"
-
-      );
-
-      Serial.println();
-
-      Serial.println(
-
-        "WiFi connected!"
-
-      );
-
-      Serial.print(
-
-        "IP Address: "
-
-      );
-
-      Serial.println(
-
-        WiFi.localIP()
-
-      );
-    }
-
-    return;
-  }
-
-  wifiConnected = false;
-
-  // Retry every 10 seconds
-
-  if (
-
-    millis() - lastWiFiAttempt >
-
-    10000
-
-  )
-
-  {
-
-    lastWiFiAttempt =
-
-      millis();
-
-    WiFi.disconnect();
-
-    WiFi.begin(
-
-      WIFI_SSID,
-
-      WIFI_PASSWORD
-
-    );
-
-    Serial.println(
-
-      "Trying WiFi..."
-
-    );
-  }
+  wifiConnected = wifiManagerIsConnected();
 }
 
 // ======================================================
@@ -3361,6 +3281,45 @@ void dismissMedicineReminderTFT(const String &actionStatus)
 }
 
 // ======================================================
+// AP MODE STARTUP CHECK (HOLD BACK BUTTON ON POWER-UP)
+// ======================================================
+bool checkAPModeTriggerOnBoot() {
+  pinMode(PIN_BTN_BACK, INPUT_PULLDOWN);
+  delay(50); // Settle electrical state
+  // Buttons are active HIGH (pressed connects the input to 3.3V).
+  if (digitalRead(PIN_BTN_BACK) != HIGH) {
+    return false; // Back button not held at power-up
+  }
+
+  // Confirm BACK stays pressed for ~1.5s to avoid triggering on electrical noise.
+  unsigned long start = millis();
+  while (millis() - start < 1500) {
+    if (digitalRead(PIN_BTN_BACK) != HIGH) return false; // Released early
+    delay(20);
+  }
+  return true;
+}
+
+void runAPModeConfiguration() {
+  initTFT();
+  drawAPModeScreen();
+  wifiManagerStartAP();
+  wifiPortalInit();
+
+  Serial.println();
+  Serial.println("==================================================");
+  Serial.println("[AP Mode] MediCare+ Wi-Fi Portal Active!");
+  Serial.println("Connect to 'MediCare+' (password: medic@re)");
+  Serial.println("Open http://192.168.4.1 in your phone browser.");
+  Serial.println("==================================================");
+
+  while (true) {
+    wifiPortalHandleClient();
+    delay(2);
+  }
+}
+
+// ======================================================
 
 // SETUP
 
@@ -3373,6 +3332,25 @@ void setup()
   Serial.begin(115200);
 
   delay(300);
+
+  // Initialize Wi-Fi Manager and load saved credentials from NVM
+  // Preserve the existing build-time credentials on first boot. Once users
+  // save portal credentials, the NVM list remains the source of truth.
+  wifiManagerInit(WIFI_SSID, WIFI_PASSWORD);
+
+  // 1. Check if BACK button is held on power-up for AP Configuration Portal
+  if (checkAPModeTriggerOnBoot()) {
+    Serial.println("[Boot] BACK button held at startup. Entering AP/QR Mode.");
+    runAPModeConfiguration();
+    return;
+  }
+
+  // 2. If no saved networks exist in NVM, automatically boot into AP/QR Mode
+  if (!wifiManagerHasSavedNetworks()) {
+    Serial.println("[Boot] No saved Wi-Fi networks found in NVM! Automatically booting into AP/QR Mode.");
+    runAPModeConfiguration();
+    return;
+  }
 
   // Buttons are active HIGH: press connects GPIO to 3.3V.
   pinMode(PIN_BTN_BACK, INPUT_PULLDOWN);
@@ -3413,11 +3391,20 @@ void setup()
 
   // ----------------------------------
 
-  // START WIFI IN BACKGROUND (used for clock sync only)
+  // START WIFI IN BACKGROUND (Managed by FreeRTOS Task C)
 
   // ----------------------------------
 
   startWiFi();
+
+  // ----------------------------------
+
+  // FREERTOS INITIALIZATION & TASKS
+
+  // ----------------------------------
+
+  rtosInitSystem();
+  rtosStartTasks();
 
   Serial.println();
 
@@ -3454,81 +3441,13 @@ void setup()
 
 // ======================================================
 
-// LOOP
+// LOOP (FreeRTOS Background Idle Yield)
 
 // ======================================================
 
 void loop()
 
 {
-
-  // ----------------------------------
-
-  // WiFi background connection
-
-  // ----------------------------------
-
-  updateWiFi();
-
-  // ----------------------------------
-
-  // Non-blocking medicine test-mode auto-hide
-
-  // ----------------------------------
-
-  if (reminderOnScreen && MEDICINE_REMINDER_TEST_MODE)
-
-  {
-
-    if (millis() - reminderStartTime >= ((unsigned long)REMINDER_TEST_AUTO_HIDE_SECONDS * 1000UL))
-
-    {
-
-      Serial.println(
-        "[TFT Test Mode] reminder display auto-hide triggered.");
-
-      hideMedicineReminderTFT();
-    }
-  }
-
-  // ----------------------------------
-
-  // Update header every second (when not showing reminder)
-
-  // ----------------------------------
-
-  if (
-
-    millis() - lastHeaderUpdate >=
-
-    1000
-
-  )
-
-  {
-
-    lastHeaderUpdate =
-
-      millis();
-
-    if (!reminderOnScreen && activePage == 0)
-
-    {
-
-      updateSensorStatus();
-
-      updateHeader();
-
-      updateBottomStatus();
-    }
-  }
-
-  checkPhysicalButtons();
-
-  // Check for active medicine reminders scheduled from MEDICARE+ web portal
-  checkFirebaseMedicineReminders();
-
-  updateSpO2Measurement();
-
-  delay(1);
+  wifiConnected = wifiManagerIsConnected();
+  vTaskDelay(pdMS_TO_TICKS(100));
 }
