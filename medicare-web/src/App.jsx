@@ -14,13 +14,14 @@ import {
 import SplashScreen from './components/SplashScreen';
 import AuthScreen from './components/AuthScreen';
 import Sidebar from './components/Sidebar';
-import { getEcgConnectionState } from './sensorStatus';
+import { isDeviceConnected } from './sensorStatus';
 
 import HomePage from './pages/HomePage';
 const TestPage = lazy(() => import('./pages/TestPage'));
 const ReportPage = lazy(() => import('./pages/ReportPage'));
 const MedicinePage = lazy(() => import('./pages/MedicinePage'));
 const HelpPage = lazy(() => import('./pages/HelpPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
 import {
@@ -50,7 +51,7 @@ export default function App() {
   const [liveVitals, setLiveVitals] = useState(null);
   const [medicines, setMedicines] = useState([]);
   const [sensorStatusClock, setSensorStatusClock] = useState(Date.now());
-  const ecgConnected = getEcgConnectionState(liveVitals?.ecg, sensorStatusClock) === 'connected';
+  const deviceConnected = isDeviceConnected(liveVitals?.device, sensorStatusClock);
 
   useEffect(() => {
     const timer = setInterval(() => setSensorStatusClock(Date.now()), 5000);
@@ -142,7 +143,9 @@ export default function App() {
   const displayName = userProfile?.name || user?.displayName || user?.email?.split('@')[0] || 'Patient';
   const photoURL = userProfile?.photoURL || user?.photoURL;
   const medicareId = userProfile?.medicareId || 'MED-PENDING';
-  const pageLabel = navItems.find((item) => item.id === activeTab)?.label || activeTab;
+  const pageLabel = activeTab === 'TERMS'
+    ? 'Terms & Conditions'
+    : navItems.find((item) => item.id === activeTab)?.label || activeTab;
 
   return (
     <div className={`app-shell ${theme === 'light' ? 'theme-light' : 'theme-dark'}`}>
@@ -178,11 +181,11 @@ export default function App() {
           </div>
 
           <div className="header-actions">
-            <div className={`device-status ${ecgConnected ? 'connected' : ''}`}>
+            <div className={`device-status ${deviceConnected ? 'connected' : ''}`}>
               <span />
               <div>
                 <small>Device link</small>
-                <strong>{ecgConnected ? 'Connected' : 'Disconnected'}</strong>
+                <strong>{deviceConnected ? 'Connected' : 'Disconnected'}</strong>
               </div>
             </div>
             <div className="profile-menu-wrap">
@@ -232,11 +235,16 @@ export default function App() {
             {activeTab === 'REPORT' && <ReportPage user={user} userProfile={userProfile} />}
             {activeTab === 'MEDICINE' && <MedicinePage user={user} userProfile={userProfile} medicines={medicines} />}
             {activeTab === 'HELP' && <HelpPage />}
+            {activeTab === 'TERMS' && <TermsPage />}
             {activeTab === 'PROFILE' && (
               <ProfilePage user={user} userProfile={userProfile} onProfileUpdated={setUserProfile} theme={theme} setTheme={setTheme} onLogout={handleLogout} liveVitals={liveVitals} />
             )}
           </Suspense>
         </main>
+        <footer className="portal-footer">
+          <span>&copy; {new Date().getFullYear()} MEDICARE+ &middot; Smart Pocket Medical Kit</span>
+          <button onClick={() => setActiveTab('TERMS')}>Terms &amp; Conditions</button>
+        </footer>
       </div>
 
       <nav className="mobile-bottom-nav" aria-label="Primary navigation">

@@ -18,12 +18,21 @@ import {
   X
 } from 'lucide-react';
 import { fetchReadingsFromDb, pushSensorReadingToDb, deleteReadingFromDb } from '../firebase';
-import { getEcgConnectionState } from '../sensorStatus';
+import {
+  getEcgConnectionState,
+  isSpO2SensorConnected,
+  isEcgModuleConnected,
+  areEcgLeadsConnected
+} from '../sensorStatus';
 
 export default function TestPage({ liveVitals }) {
   // activeSubView: 'TILES' | 'SPO2' | 'ECG'
   const [activeSubView, setActiveSubView] = useState('TILES');
   const [clock, setClock] = useState(Date.now());
+  const devicePresence = liveVitals?.device;
+  const spo2SensorConnected = isSpO2SensorConnected(devicePresence, clock);
+  const ecgModuleConnected = isEcgModuleConnected(devicePresence, clock);
+  const ecgLeadsConnected = areEcgLeadsConnected(devicePresence, clock);
   const ecgConnected = getEcgConnectionState(liveVitals?.ecg, clock) === 'connected';
 
   // Filter states
@@ -254,8 +263,8 @@ export default function TestPage({ liveVitals }) {
                     <Heart className="w-8 h-8 text-cyan-400 fill-cyan-400/20 group-hover:scale-110 transition-transform animate-pulse" />
                   </div>
                 </div>
-                <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-bold border border-cyan-500/30">
-                  MAX30102 SENSOR
+                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${spo2SensorConnected ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border-rose-500/30'}`}>
+                  MAX30102 {spo2SensorConnected ? 'ONLINE' : 'DISCONNECTED'}
                 </span>
               </div>
 
@@ -275,8 +284,9 @@ export default function TestPage({ liveVitals }) {
                 </div>
                 <div className="text-right">
                   <span className="text-[11px] text-slate-400 uppercase font-semibold block">Status</span>
-                  <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                    <CheckCircle className="w-3.5 h-3.5" /> Optimal
+                  <span className={`text-xs font-bold flex items-center gap-1 ${spo2SensorConnected ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {spo2SensorConnected ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                    {spo2SensorConnected ? 'Sensor Online' : 'Sensor Disconnected'}
                   </span>
                 </div>
               </div>
@@ -322,7 +332,7 @@ export default function TestPage({ liveVitals }) {
                 <div className="text-right">
                   <span className="text-[11px] text-slate-400 uppercase font-semibold block">Rhythm</span>
                   <span className="text-xs font-bold text-cyan-400 flex items-center gap-1">
-                    {ecgConnected ? <><CheckCircle className="w-3.5 h-3.5" /> ECG Connected</> : <><AlertTriangle className="w-3.5 h-3.5" /> Disconnected</>}
+                    {ecgModuleConnected ? <><CheckCircle className="w-3.5 h-3.5" /> ECG Module Connected</> : <><AlertTriangle className="w-3.5 h-3.5" /> ECG Module Disconnected</>}
                   </span>
                 </div>
               </div>
@@ -633,10 +643,10 @@ export default function TestPage({ liveVitals }) {
           <div className="glass-card rounded-3xl p-6 border border-slate-800">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${ecgConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                  {ecgConnected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${ecgModuleConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                  {ecgModuleConnected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
                 </span>
-                <span className="text-sm font-bold text-white">{ecgConnected ? 'ECG Module Connected' : 'ECG Module Disconnected'}</span>
+                <span className="text-sm font-bold text-white">{ecgModuleConnected ? 'ECG Module Connected' : 'ECG Module Disconnected'}</span>
               </div>
               <div className="flex items-center gap-4 text-xs font-mono text-cyan-400">
                 <span>Sweep: 25mm/s</span>
@@ -650,7 +660,9 @@ export default function TestPage({ liveVitals }) {
                   width={800}
                   height={220}
                   className="w-full h-48 block"
-                /> : <div className="h-48 flex items-center justify-center text-sm font-semibold text-rose-300">Connect the AD8232 module and complete a recording to display its ECG graph.</div>}
+                /> : <div className={`h-48 flex items-center justify-center text-center text-sm font-semibold ${ecgModuleConnected ? 'text-amber-300' : 'text-rose-300'}`}>
+                  {ecgModuleConnected ? 'ECG module is connected. Complete a recording to display its graph.' : 'Connect the AD8232 module to show ECG as connected.'}
+                </div>}
             </div>
 
             {/* Live Metrics Grid */}
@@ -660,7 +672,7 @@ export default function TestPage({ liveVitals }) {
               const isHighBpm = currentBpm > 100;
               const isDoctorAlert = ecgConnected && (isLowBpm || isHighBpm || liveVitals.ecg.doctorAlert);
               const rhythmStr = ecgConnected ? (liveVitals.ecg.rhythm || '—') : '—';
-              const leadsOk = ecgConnected;
+              const leadsOk = ecgLeadsConnected;
 
               return (
                 <>

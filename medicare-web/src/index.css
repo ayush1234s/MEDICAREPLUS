@@ -364,6 +364,8 @@ textarea:focus-visible {
 
 /* Header and content frame */
 .portal-main {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   margin-left: 248px;
   transition: margin-left 0.25s ease;
@@ -592,10 +594,33 @@ textarea:focus-visible {
 }
 
 .portal-content {
+  flex: 1 0 auto;
   max-width: 1500px;
-  min-height: calc(100vh - 78px);
+  width: 100%;
   margin: 0 auto;
   padding: 34px 38px 50px;
+}
+
+.portal-footer {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 38px 20px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.portal-footer button {
+  border: 0;
+  background: transparent;
+  color: var(--brand-strong);
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .portal-content > * {
@@ -1532,7 +1557,7 @@ textarea:focus-visible {
 
   .portal-header {
     height: 68px;
-    padding: 0 14px;
+    padding: 0 8px;
   }
 
   .header-title {
@@ -1542,7 +1567,7 @@ textarea:focus-visible {
   .header-brand-mobile {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
   }
 
   .icon-button {
@@ -1572,8 +1597,8 @@ textarea:focus-visible {
   }
 
   .mobile-brand .brand-mark {
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
     border-radius: 10px;
   }
 
@@ -1581,22 +1606,51 @@ textarea:focus-visible {
     width: 17px;
   }
 
-  .device-status,
   .profile-copy,
   .profile-trigger > svg {
     display: none;
   }
 
+  .device-status {
+    height: 36px;
+    gap: 5px;
+    padding: 0 5px;
+    border-radius: 10px;
+  }
+
+  .device-status > span {
+    width: 7px;
+    height: 7px;
+  }
+
+  .device-status div {
+    display: block;
+  }
+
+  .device-status small {
+    display: none;
+  }
+
+  .device-status strong {
+    margin: 0;
+    font-size: 8px;
+    white-space: nowrap;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
   .profile-trigger {
-    width: 42px;
-    height: 42px;
+    width: 38px;
+    height: 38px;
     padding: 5px;
   }
 
   .profile-trigger img,
   .profile-trigger .profile-avatar {
-    width: 32px;
-    height: 32px;
+    width: 26px;
+    height: 26px;
   }
 
   .profile-menu {
@@ -1606,8 +1660,16 @@ textarea:focus-visible {
   }
 
   .portal-content {
-    min-height: calc(100vh - 68px);
+    min-height: 0;
     padding: 18px 14px 96px;
+  }
+
+  .portal-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 14px 16px 96px;
+    font-size: 10px;
   }
 
   .permission-banner {

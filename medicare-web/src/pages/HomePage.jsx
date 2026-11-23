@@ -9,7 +9,7 @@ import {
   CheckCircle, 
   ShieldAlert
 } from 'lucide-react';
-import { getEcgConnectionState } from '../sensorStatus';
+import { isDeviceConnected, isSpO2SensorConnected } from '../sensorStatus';
 
 export default function HomePage({ onNavigate, liveVitals, medicines = [], user, userProfile }) {
   const [advisoryLanguage, setAdvisoryLanguage] = useState('en');
@@ -22,7 +22,8 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
     const timer = setInterval(() => setClock(Date.now()), 5000);
     return () => clearInterval(timer);
   }, []);
-  const ecgConnected = getEcgConnectionState(liveVitals?.ecg, clock) === 'connected';
+  const deviceConnected = isDeviceConnected(liveVitals?.device, clock);
+  const spo2Connected = isSpO2SensorConnected(liveVitals?.device, clock);
 
   return (
     <div className="space-y-10 pb-16">
@@ -39,10 +40,10 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
           {/* Live Device Pill */}
           <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 text-xs font-semibold mb-6 shadow-sm">
             <span className="relative flex h-2 w-2">
-              {ecgConnected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${ecgConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+              {deviceConnected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${deviceConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
             </span>
-            <span>MEDICARE+ Device: {ecgConnected ? 'Connected' : 'Disconnected'} · Cloud Sync Active</span>
+            <span>MEDICARE+ Device: {deviceConnected ? 'Connected · Cloud Sync' : 'Disconnected · Cloud Offline'}</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-[-0.045em] leading-[.98] mb-5">
@@ -94,8 +95,8 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
               <div className="text-2xl font-black text-white">
                 {liveVitals?.spo2?.spo2 ? `${liveVitals.spo2.spo2}%` : '98%'}
               </div>
-              <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1 mt-1">
-                <CheckCircle className="w-3 h-3" /> Normal SpO2
+              <span className={`text-[11px] font-semibold flex items-center gap-1 mt-1 ${spo2Connected ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <CheckCircle className={`w-3 h-3 ${spo2Connected ? '' : 'text-rose-400'}`} /> SpO2 Sensor {spo2Connected ? 'Online' : 'Disconnected'}
               </span>
             </div>
 
@@ -130,8 +131,8 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
                 <span>MEDICARE+ Device Status</span>
                 <Wifi className="w-4 h-4 text-cyan-400" />
               </div>
-              <div className={`text-xl font-bold ${ecgConnected ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {ecgConnected ? 'Device Connected' : 'Device Disconnected'}
+              <div className={`text-xl font-bold ${deviceConnected ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {deviceConnected ? 'Device Connected' : 'Device Disconnected'}
               </div>
               <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1 mt-1">
                 Firebase RTDB · Smart Kit

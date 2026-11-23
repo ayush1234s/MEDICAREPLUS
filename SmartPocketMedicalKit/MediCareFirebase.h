@@ -210,6 +210,34 @@ inline bool uploadECGToFirebase(int bpm, const String &rhythm = "Normal Sinus Rh
   return (httpCode == 200 || httpCode == 201);
 }
 
+// Publish a lightweight heartbeat so the web portal can distinguish an online
+// device from old sensor readings. The browser expires stale heartbeats when
+// the device is powered off or loses its cloud connection.
+inline bool publishDeviceHeartbeat(bool spo2Connected, bool ecgConnected,
+                                   bool ecgLeadsConnected) {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(2);
+
+  HTTPClient http;
+  String url = String(FIREBASE_BASE_URL) + "/live/device.json";
+  http.begin(client, url);
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  http.addHeader("Content-Type", "application/json");
+  String payload = "{\"connected\":true,";
+  payload += "\"spo2Connected\":" + String(spo2Connected ? "true" : "false") + ",";
+  payload += "\"ecgConnected\":" + String(ecgConnected ? "true" : "false") + ",";
+  payload += "\"ecgLeadsConnected\":" + String(ecgLeadsConnected ? "true" : "false") + ",";
+  payload += "\"lastSeen\":{\".sv\":\"timestamp\"}}";
+  const int code = http.PUT(payload);
+  http.end();
+  if (code == 200 || code == 204) return true;
+  Serial.printf("[Firebase] Device heartbeat failed (HTTP %d)\n", code);
+  return false;
+}
+
 // ----------------------------------------------------------------------------
 // 3. Poll Active Medicine Reminder from Firebase
 // ----------------------------------------------------------------------------

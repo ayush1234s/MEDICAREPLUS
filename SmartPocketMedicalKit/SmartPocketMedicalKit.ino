@@ -2371,6 +2371,19 @@ bool areECGLeadsAttached() {
   return (digitalRead(PIN_AD8232_LOM) == LOW && digitalRead(PIN_AD8232_LOP) == LOW);
 }
 
+bool publishDeviceHeartbeatToCloud() {
+  bool spo2Connected = max30102Ready;
+  if (rtosLockI2C(pdMS_TO_TICKS(60))) {
+    spo2Connected = checkMAX30102Connection();
+    rtosUnlockI2C();
+  }
+
+  const bool ecgConnected = isECGModuleConnected();
+  const bool ecgLeadsConnected = ecgConnected &&
+      digitalRead(PIN_AD8232_LOM) == LOW && digitalRead(PIN_AD8232_LOP) == LOW;
+  return publishDeviceHeartbeat(spo2Connected, ecgConnected, ecgLeadsConnected);
+}
+
 void drawCompactECGHeartIcon(int cx, int cy, uint16_t color) {
   fillRect(cx - 5, cy - 7, 4, 3, color);
   fillRect(cx + 2, cy - 7, 4, 3, color);
@@ -3145,7 +3158,7 @@ void updateSpO2Measurement() {
       updateSpO2MeasuringProgress(sec);
     }
 
-    if (now - lastGraphDrawTime >= 45) {
+    if (now - lastGraphDrawTime >= 75) {
       lastGraphDrawTime = now;
       drawLiveWaveformLineGraph();
     }

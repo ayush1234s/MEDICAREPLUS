@@ -22,6 +22,7 @@ extern void checkPhysicalButtons();
 extern void updateSpO2Measurement();
 extern void updateECGMeasurement();
 extern void pollFirebaseReminders();
+extern bool publishDeviceHeartbeatToCloud();
 extern void updateHeader();
 extern void updateBottomStatus();
 extern void updateSensorStatus();
@@ -277,12 +278,14 @@ static void taskSensor(void *pvParams) {
       }
       vTaskDelay(pdMS_TO_TICKS(10));
     } else if (activePage == 2) {
-      if (rtosLockI2C(pdMS_TO_TICKS(20))) {
-        if (rtosLockTFT(pdMS_TO_TICKS(20))) {
+      // Keep the shared lock order consistent with TaskMainUI (TFT, then I2C)
+      // to prevent the sensor and UI tasks from waiting on each other.
+      if (rtosLockTFT(pdMS_TO_TICKS(20))) {
+        if (rtosLockI2C(pdMS_TO_TICKS(20))) {
           updateSpO2Measurement();
-          rtosUnlockTFT();
+          rtosUnlockI2C();
         }
-        rtosUnlockI2C();
+        rtosUnlockTFT();
       }
       vTaskDelay(pdMS_TO_TICKS(10));
     } else {
@@ -326,9 +329,15 @@ static void taskWiFi(void *pvParams) {
 static void taskFirebase(void *pvParams) {
   Serial.println("[RTOS] Task D (Firebase Sync) running on Core 0.");
   static unsigned long lastPoll = 0;
+  static unsigned long lastPresence = 0;
 
   for (;;) {
     if (wifiManagerIsConnected()) {
+      if (millis() - lastPresence >= 5000UL) {
+        lastPresence = millis();
+        publishDeviceHeartbeatToCloud();
+      }
+
       // 1. Drain pending offline records if any
       OfflineReading rec;
       if (rtosGetPendingOfflineReading(rec)) {
