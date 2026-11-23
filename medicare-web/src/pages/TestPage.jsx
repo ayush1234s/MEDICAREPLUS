@@ -14,13 +14,17 @@ import {
   TrendingUp,
   Cpu,
   Trash2,
+  ShieldAlert,
   X
 } from 'lucide-react';
 import { fetchReadingsFromDb, pushSensorReadingToDb, deleteReadingFromDb } from '../firebase';
+import { getEcgConnectionState } from '../sensorStatus';
 
 export default function TestPage({ liveVitals }) {
   // activeSubView: 'TILES' | 'SPO2' | 'ECG'
   const [activeSubView, setActiveSubView] = useState('TILES');
+  const [clock, setClock] = useState(Date.now());
+  const ecgConnected = getEcgConnectionState(liveVitals?.ecg, clock) === 'connected';
 
   // Filter states
   const [fromDate, setFromDate] = useState('');
@@ -34,6 +38,11 @@ export default function TestPage({ liveVitals }) {
 
   // Animated ECG Canvas ref
   const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Fetch readings when view or dates change
   const loadReadings = async (type, fDate = fromDate, tDate = toDate) => {
@@ -146,7 +155,7 @@ export default function TestPage({ liveVitals }) {
 
   // Canvas ECG live rhythm animation
   useEffect(() => {
-    if (activeSubView !== 'ECG') return;
+    if (activeSubView !== 'ECG' || !ecgConnected) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -163,18 +172,15 @@ export default function TestPage({ liveVitals }) {
     }
 
     const render = () => {
-      step = (step + 2) % 180;
+      const realSamples = liveVitals?.ecg?.samples || readings[0]?.samples;
       let yOffset = 0;
-      if (step > 40 && step < 55) {
-        yOffset = -15 * Math.sin((step - 40) / 15 * Math.PI); // P wave
-      } else if (step >= 55 && step < 60) {
-        yOffset = 10; // Q dip
-      } else if (step >= 60 && step < 72) {
-        yOffset = -55 * Math.sin((step - 60) / 12 * Math.PI); // R peak
-      } else if (step >= 72 && step < 78) {
-        yOffset = 18; // S dip
-      } else if (step >= 90 && step < 120) {
-        yOffset = -22 * Math.sin((step - 90) / 30 * Math.PI); // T wave
+      if (Array.isArray(realSamples) && realSamples.length > 5) {
+        step = (step + 1) % realSamples.length;
+        const raw = realSamples[step];
+        // Center around 2048 (12-bit ADC midpoint) and scale to canvas
+        yOffset = -((raw - 2048) / 2048) * 80;
+      } else {
+        yOffset = 0;
       }
 
       points.shift();
@@ -216,7 +222,7 @@ export default function TestPage({ liveVitals }) {
 
     render();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [activeSubView]);
+  }, [activeSubView, liveVitals, readings, ecgConnected]);
 
   return (
     <div className="space-y-8 pb-16 max-w-6xl mx-auto">
@@ -310,13 +316,13 @@ export default function TestPage({ liveVitals }) {
                 <div>
                   <span className="text-[11px] text-slate-400 uppercase font-semibold block">Latest Heart Rate</span>
                   <span className="text-2xl font-black text-white">
-                    {liveVitals?.ecg?.bpm || liveVitals?.spo2?.bpm || '74'} <span className="text-xs font-normal text-slate-400">BPM</span>
+                    {ecgConnected ? liveVitals.ecg.bpm : '--'} <span className="text-xs font-normal text-slate-400">{ecgConnected ? 'BPM' : ''}</span>
                   </span>
                 </div>
                 <div className="text-right">
                   <span className="text-[11px] text-slate-400 uppercase font-semibold block">Rhythm</span>
                   <span className="text-xs font-bold text-cyan-400 flex items-center gap-1">
-                    <CheckCircle className="w-3.5 h-3.5" /> Normal Sinus
+                    {ecgConnected ? <><CheckCircle className="w-3.5 h-3.5" /> ECG Connected</> : <><AlertTriangle className="w-3.5 h-3.5" /> Disconnected</>}
                   </span>
                 </div>
               </div>
@@ -325,6 +331,24 @@ export default function TestPage({ liveVitals }) {
                 <span>Open ECG + Heart Monitor</span>
                 <Zap className="w-4 h-4" />
               </button>
+            </div>
+          </div>
+
+          {/* Medical Notice & Patient Safety Disclaimer */}
+          <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 shadow-lg">
+            <div className="flex items-start gap-3.5">
+              <ShieldAlert className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                  Important Medical Notice & Patient Safety Disclaimer
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  The physiological recordings and electrocardiogram data presented on this dashboard are intended strictly for general wellness tracking and preliminary patient observation. While the readings are recorded from physical sensors, this system is <strong>not a certified medical diagnostic device</strong>.
+                </p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Do not attempt to self-diagnose or modify medical treatment based solely on these readings.</strong> If you or the patient experience severe symptoms—including chest discomfort or pain, shortness of breath, dizziness, lightheadedness, or sudden palpitations—<strong>please visit a hospital immediately or consult a qualified physician for professional medical care</strong>.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -542,6 +566,24 @@ export default function TestPage({ liveVitals }) {
               </table>
             </div>
           </div>
+
+          {/* Medical Notice & Patient Safety Disclaimer */}
+          <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 shadow-lg">
+            <div className="flex items-start gap-3.5">
+              <ShieldAlert className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                  Important Medical Notice & Patient Safety Disclaimer
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  The physiological recordings and electrocardiogram data presented on this dashboard are intended strictly for general wellness tracking and preliminary patient observation. While the readings are recorded from physical sensors, this system is <strong>not a certified medical diagnostic device</strong>.
+                </p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Do not attempt to self-diagnose or modify medical treatment based solely on these readings.</strong> If you or the patient experience severe symptoms—including chest discomfort or pain, shortness of breath, dizziness, lightheadedness, or sudden palpitations—<strong>please visit a hospital immediately or consult a qualified physician for professional medical care</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -591,11 +633,10 @@ export default function TestPage({ liveVitals }) {
           <div className="glass-card rounded-3xl p-6 border border-slate-800">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${ecgConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                  {ecgConnected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
                 </span>
-                <span className="text-sm font-bold text-white">Live Electrocardiogram Rhythm (Lead I)</span>
+                <span className="text-sm font-bold text-white">{ecgConnected ? 'ECG Module Connected' : 'ECG Module Disconnected'}</span>
               </div>
               <div className="flex items-center gap-4 text-xs font-mono text-cyan-400">
                 <span>Sweep: 25mm/s</span>
@@ -604,34 +645,81 @@ export default function TestPage({ liveVitals }) {
             </div>
 
             <div className="rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 p-2 shadow-inner">
-              <canvas
-                ref={canvasRef}
-                width={800}
-                height={220}
-                className="w-full h-48 block"
-              />
+              {ecgConnected ? <canvas
+                  ref={canvasRef}
+                  width={800}
+                  height={220}
+                  className="w-full h-48 block"
+                /> : <div className="h-48 flex items-center justify-center text-sm font-semibold text-rose-300">Connect the AD8232 module and complete a recording to display its ECG graph.</div>}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 text-center">
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Heart Rate</span>
-                <span className="text-xl font-bold text-white">
-                  {liveVitals?.ecg?.bpm || liveVitals?.spo2?.bpm || readings[0]?.bpm || '74'} BPM
-                </span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Rhythm Type</span>
-                <span className="text-xs font-bold text-emerald-400 mt-1 block">Normal Sinus</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">PR Interval</span>
-                <span className="text-sm font-bold text-slate-200">140 ms</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">QRS Complex</span>
-                <span className="text-sm font-bold text-slate-200">86 ms</span>
-              </div>
-            </div>
+            {/* Live Metrics Grid */}
+            {(() => {
+              const currentBpm = ecgConnected ? liveVitals.ecg.bpm : null;
+              const isLowBpm = currentBpm < 60;
+              const isHighBpm = currentBpm > 100;
+              const isDoctorAlert = ecgConnected && (isLowBpm || isHighBpm || liveVitals.ecg.doctorAlert);
+              const rhythmStr = ecgConnected ? (liveVitals.ecg.rhythm || '—') : '—';
+              const leadsOk = ecgConnected;
+
+              return (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 mt-6 text-center">
+                    <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">Heart Rate</span>
+                      <span className={`text-xl font-bold ${isLowBpm ? 'text-amber-400' : (isHighBpm ? 'text-rose-400' : 'text-white')}`}>
+                        {currentBpm ? `${currentBpm} BPM` : '—'}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">Rhythm Type</span>
+                      <span className={`text-xs font-bold mt-1 block ${isDoctorAlert ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        {rhythmStr}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">PR Interval</span>
+                      <span className="text-sm font-bold text-slate-200">
+                        {ecgConnected ? (liveVitals.ecg.prInterval || '—') : '—'}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">QRS Complex</span>
+                      <span className="text-sm font-bold text-slate-200">
+                        {ecgConnected ? (liveVitals.ecg.qrsDuration || '—') : '—'}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">QT Interval</span>
+                      <span className="text-sm font-bold text-slate-200">
+                        {ecgConnected ? (liveVitals.ecg.qtInterval || '—') : '—'}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">Electrode Leads</span>
+                      <span className={`text-xs font-bold mt-1 block ${leadsOk ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        {leadsOk ? 'Connected (3-Lead)' : 'Disconnected'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Doctor Consultation Clinical Alert Banner */}
+                  {isDoctorAlert && (
+                    <div className="mt-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 p-4 text-amber-200 flex items-start gap-3.5 shadow-sm">
+                      <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-bold text-amber-300">
+                          Clinical Notice: {isLowBpm ? 'Low Heart Rate (< 60 BPM / Bradycardia)' : 'Abnormal Rhythm'} Detected
+                        </h4>
+                        <p className="text-xs text-amber-200/90 leading-relaxed">
+                          The recorded heart rate is below the standard clinical resting threshold or displays rhythm irregularity. Please schedule a checkup with a qualified doctor or cardiologist for an in-depth medical evaluation.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Date Filter Form */}
@@ -758,6 +846,24 @@ export default function TestPage({ liveVitals }) {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* Medical Notice & Patient Safety Disclaimer */}
+          <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 shadow-lg">
+            <div className="flex items-start gap-3.5">
+              <ShieldAlert className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                  Important Medical Notice & Patient Safety Disclaimer
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  The physiological recordings and electrocardiogram data presented on this dashboard are intended strictly for general wellness tracking and preliminary patient observation. While the readings are recorded from physical sensors, this system is <strong>not a certified medical diagnostic device</strong>.
+                </p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Do not attempt to self-diagnose or modify medical treatment based solely on these readings.</strong> If you or the patient experience severe symptoms—including chest discomfort or pain, shortness of breath, dizziness, lightheadedness, or sudden palpitations—<strong>please visit a hospital immediately or consult a qualified physician for professional medical care</strong>.
+                </p>
+              </div>
             </div>
           </div>
         </div>

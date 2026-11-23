@@ -20,6 +20,7 @@ static uint8_t _offlineCount = 0;
 // External functions from main sketch and Firebase bridge
 extern void checkPhysicalButtons();
 extern void updateSpO2Measurement();
+extern void updateECGMeasurement();
 extern void pollFirebaseReminders();
 extern void updateHeader();
 extern void updateBottomStatus();
@@ -269,7 +270,13 @@ static void taskMainUI(void *pvParams) {
 static void taskSensor(void *pvParams) {
   Serial.println("[RTOS] Task B (Sensor Monitoring) running on Core 1.");
   for (;;) {
-    if (activePage == 2) {
+    if (activePage == 1) {
+      if (rtosLockTFT(pdMS_TO_TICKS(20))) {
+        updateECGMeasurement();
+        rtosUnlockTFT();
+      }
+      vTaskDelay(pdMS_TO_TICKS(10));
+    } else if (activePage == 2) {
       if (rtosLockI2C(pdMS_TO_TICKS(20))) {
         if (rtosLockTFT(pdMS_TO_TICKS(20))) {
           updateSpO2Measurement();
@@ -386,8 +393,8 @@ void rtosStartTasks() {
   xTaskCreatePinnedToCore(taskMedicineTime, "TaskMedTime", 3072, NULL, 2, NULL, 1);
 
   // Core 0 Tasks: Networking & Cloud
-  xTaskCreatePinnedToCore(taskWiFi, "TaskWiFi", 4096, NULL, 2, NULL, 0);
-  xTaskCreatePinnedToCore(taskFirebase, "TaskFirebase", 5120, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(taskWiFi, "TaskWiFi", 6144, NULL, 2, NULL, 0);
+  xTaskCreatePinnedToCore(taskFirebase, "TaskFirebase", 6144, NULL, 1, NULL, 0);
 
   Serial.println("[RTOS] All 5 FreeRTOS Tasks initialized and pinned to cores successfully.");
 }

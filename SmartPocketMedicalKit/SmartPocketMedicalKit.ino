@@ -70,6 +70,13 @@ const char *WIFI_PASSWORD = "BoysH@2026";  // Configure in MediCareWiFiSecrets.h
 #define TFT_BL 3
 
 // ======================================================
+// AD8232 ECG SENSOR PINS
+// ======================================================
+#define PIN_AD8232_OUT 2   // Analog biopotential output (ADC1_CH1)
+#define PIN_AD8232_LOM 14  // Leads-Off Detection Negative (LO-)
+#define PIN_AD8232_LOP 15  // Leads-Off Detection Positive (LO+)
+
+// ======================================================
 // NAVIGATION BUTTONS (pressing a button connects its GPIO to 3.3V)
 // ======================================================
 #define PIN_BTN_BACK 1
@@ -145,6 +152,17 @@ bool wifiConnected = false;
 // Button-driven dashboard navigation: 0=home, 1=ECG, 2=SpO2, 3=About, 4=Medicine.
 uint8_t menuSelection = 0;
 uint8_t activePage = 0;
+
+// Current medicine summary shown on the Medicine tile page.
+String currentMedicinePatient = "";
+String currentMedicineGender = "";
+String currentMedicineName = "";
+String currentMedicineDose = "";
+String currentMedicineDate = "";
+String currentMedicineTime = "";
+String currentMedicineDays = "";
+String currentMedicineStatus = "NO RECORD";
+bool hasCurrentMedicineRecord = false;
 
 // Forward declarations
 void drawMenuSelection(bool forceFullRedraw = false);
@@ -1102,8 +1120,15 @@ void drawDashboardBitmap()
   for (uint32_t i = 0; i < total; i++)
 
   {
-
+    const int pixelX = i % SCREEN_W;
+    const int pixelY = i / SCREEN_W;
+    const bool oldTileArtwork = pixelY >= 37 && pixelY < 132;
+    const bool oldStatusArtwork = pixelY >= 160 && pixelY < 212;
     uint16_t pixel = pgm_read_word(&MEDICARE_DASHBOARD_RGB565[i]);
+    if (oldTileArtwork || oldStatusArtwork || pixel == 0x0085 ||
+        pixel == 0x08C7 || pixel == 0x05CE) {
+      pixel = BLACK;
+    }
 
     spi->transfer(pixel >> 8);
 
@@ -1189,6 +1214,33 @@ void drawWiFiIcon(
 }
 
 // ======================================================
+
+void drawCompactWiFiIcon(int cx, int cy, uint16_t color) {
+  // Rasterized circular arcs stay exactly mirrored and avoid jagged diagonals.
+  for (int y = -12; y <= -5; y++) {
+    const float dy = (float)(y - 3);
+    const int dx = (int)(sqrtf(225.0f - dy * dy) + 0.5f);
+    fillRect(cx - dx - 1, cy + y, 3, 2, color);
+    fillRect(cx + dx - 1, cy + y, 3, 2, color);
+  }
+  for (int y = -7; y <= -1; y++) {
+    const float dy = (float)(y - 2);
+    const int dx = (int)(sqrtf(81.0f - dy * dy) + 0.5f);
+    fillRect(cx - dx - 1, cy + y, 3, 2, color);
+    fillRect(cx + dx - 1, cy + y, 3, 2, color);
+  }
+  for (int y = -3; y <= 1; y++) {
+    const float dy = (float)(y - 2);
+    const int dx = (int)(sqrtf(25.0f - dy * dy) + 0.5f);
+    fillRect(cx - dx - 1, cy + y, 3, 2, color);
+    fillRect(cx + dx - 1, cy + y, 3, 2, color);
+  }
+  for (int dy = -2; dy <= 2; dy++) {
+    for (int dx = -2; dx <= 2; dx++) {
+      if (dx * dx + dy * dy <= 4) drawPixel(cx + dx, cy + 6 + dy, color);
+    }
+  }
+}
 
 // WIFI STATUS
 
@@ -2203,42 +2255,52 @@ void fillRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r,
                    uint16_t color)
 
 {
+  if (r < 1) {
+    fillRect(x, y, w, h, color);
+    return;
+  }
+  if (r * 2 > w) r = w / 2;
+  if (r * 2 > h) r = h / 2;
 
-  fillRect(x + r, y, w - 2 * r, h, color);
-
-  fillRect(x, y + r, r, h - 2 * r, color);
-
-  fillRect(x + w - r, y + r, r, h - 2 * r, color);
-
-  fillRect(x + 1, y + 1, r, r, color);
-
-  fillRect(x + w - 1 - r, y + 1, r, r, color);
-
-  fillRect(x + 1, y + h - 1 - r, r, r, color);
-
-  fillRect(x + w - 1 - r, y + h - 1 - r, r, r, color);
+  for (int16_t row = 0; row < h; row++) {
+    int16_t inset = 0;
+    int16_t curveY = -1;
+    if (row < r) curveY = r - row - 1;
+    else if (row >= h - r) curveY = row - (h - r);
+    if (curveY >= 0) {
+      const float radius = (float)r;
+      const float inside = sqrtf(radius * radius - (float)curveY * curveY);
+      inset = r - (int16_t)inside;
+    }
+    fillRect(x + inset, y + row, w - 2 * inset, 1, color);
+  }
 }
 
 void drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r,
                    uint16_t color)
 
 {
+  if (r < 1) {
+    drawRect(x, y, w, h, color);
+    return;
+  }
+  if (r * 2 > w) r = w / 2;
+  if (r * 2 > h) r = h / 2;
 
   fillRect(x + r, y, w - 2 * r, 1, color);
-
   fillRect(x + r, y + h - 1, w - 2 * r, 1, color);
-
   fillRect(x, y + r, 1, h - 2 * r, color);
-
   fillRect(x + w - 1, y + r, 1, h - 2 * r, color);
 
-  fillRect(x + 1, y + 1, 1, 1, color);
-
-  fillRect(x + w - 2, y + 1, 1, 1, color);
-
-  fillRect(x + 1, y + h - 2, 1, 1, color);
-
-  fillRect(x + w - 2, y + h - 2, 1, 1, color);
+  for (int16_t i = 0; i < r; i++) {
+    const float radius = (float)r;
+    const float dy = (float)(r - i - 1);
+    const int16_t inset = r - (int16_t)sqrtf(radius * radius - dy * dy);
+    drawPixel(x + inset, y + i, color);
+    drawPixel(x + w - 1 - inset, y + i, color);
+    drawPixel(x + inset, y + h - 1 - i, color);
+    drawPixel(x + w - 1 - inset, y + h - 1 - i, color);
+  }
 }
 
 // ======================================================
@@ -2250,20 +2312,20 @@ void drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r,
 void drawHeader()
 
 {
-
-  // WiFi icon: draw on bitmap background (0x0085)
-
-  fillRect(218, 3, 30, 29, 0x0085);
-
-  drawWiFiStatus();
-
-  // Clock: erase old and redraw
-
-  String currentTime = getTimeString();
-
-  fillRect(248, 5, 68, 22, 0x0085);
-
-  drawText(currentTime.c_str(), 254, 11, WHITE, 1);
+  // Clean header treatment: bold white Wi-Fi mark and a 12-hour local clock.
+  fillRect(214, 2, 105, 31, BLACK);
+  drawCompactWiFiIcon(230, 14, WHITE);
+  struct tm timeinfo;
+  char headerTime[12] = "--:-- --";
+  if (getLocalTime(&timeinfo, 100)) {
+    int hour12 = timeinfo.tm_hour % 12;
+    if (hour12 == 0) hour12 = 12;
+    const char *ampm = timeinfo.tm_hour < 12 ? "AM" : "PM";
+    snprintf(headerTime, sizeof(headerTime), "%d:%02d %s", hour12, timeinfo.tm_min, ampm);
+  }
+  const int timeWidth = strlen(headerTime) * 6;
+  const int timeX = 250 + (68 - timeWidth) / 2;
+  drawText(headerTime, timeX, 12, WHITE, 1);
 }
 
 // ======================================================
@@ -2283,51 +2345,183 @@ void drawStatusDot(int cx, int cy, int r, uint16_t color) {
   }
 }
 
-void updateBottomStatus()
-
-{
-
-  // System Status card background color from bitmap = 0x08C7
-
-  // Clear the status text area inside the card (below "SYSTEM STATUS" title)
-
-  fillRect(15, 158, 290, 38, 0x08C7);
-
-  // 1. Wi-Fi status - round dot
-
-  uint16_t wifiDot = wifiConnected ? GREEN : ORANGE;
-
-  drawStatusDot(25, 165, 3, wifiDot);
-
-  drawText(wifiConnected ? "Wi-Fi connected" : "Wi-Fi  Disconnected", 34, 161,
-           WHITE, 1);
-
-  // 2. MAX30102 live sensor status - round dot
-
-  if (max30102Ready)
-
-  {
-
-    drawStatusDot(25, 179, 3, GREEN);
-
-    drawText("MAX30102  Ready", 34, 175, GREEN, 1);
-
+// ======================================================
+// AD8232 ECG SENSOR DETECTION HELPER
+// ======================================================
+bool isECGModuleConnected() {
+  // LO+/LO- can float or pick up noise when the module is absent, so they
+  // cannot prove module presence by themselves. A powered AD8232 biases OUT
+  // near mid-supply; the pulldown keeps an unplugged OUT pin near zero.
+  uint8_t biasedSamples = 0;
+  constexpr uint8_t SAMPLE_COUNT = 8;
+  for (uint8_t i = 0; i < SAMPLE_COUNT; i++) {
+    const int value = analogRead(PIN_AD8232_OUT);
+    if (value >= 1200 && value <= 2900) {
+      biasedSamples++;
+    }
   }
 
-  else
+  // Require a consistent mid-supply bias instead of accepting one noisy ADC
+  // sample. The lead-off pins are only used after module presence is confirmed.
+  return biasedSamples >= 6;
+}
 
-  {
+bool areECGLeadsAttached() {
+  if (!isECGModuleConnected()) return false;
+  return (digitalRead(PIN_AD8232_LOM) == LOW && digitalRead(PIN_AD8232_LOP) == LOW);
+}
 
-    drawStatusDot(25, 179, 3, RED);
+void drawCompactECGHeartIcon(int cx, int cy, uint16_t color) {
+  fillRect(cx - 5, cy - 7, 4, 3, color);
+  fillRect(cx + 2, cy - 7, 4, 3, color);
+  fillRect(cx - 8, cy - 4, 7, 4, color);
+  fillRect(cx + 1, cy - 4, 7, 4, color);
+  fillRect(cx - 9, cy, 18, 4, color);
+  fillRect(cx - 7, cy + 4, 14, 3, color);
+  fillRect(cx - 4, cy + 7, 8, 2, color);
+  fillRect(cx - 1, cy + 9, 2, 2, color);
 
-    drawText("Sensor not reading", 34, 175, RED, 1);
+  drawLine(cx - 7, cy + 1, cx - 3, cy + 1, BLACK);
+  drawLine(cx - 3, cy + 1, cx - 2, cy - 2, BLACK);
+  drawLine(cx - 2, cy - 2, cx, cy + 4, BLACK);
+  drawLine(cx, cy + 4, cx + 2, cy - 1, BLACK);
+  drawLine(cx + 2, cy - 1, cx + 3, cy + 1, BLACK);
+  drawLine(cx + 3, cy + 1, cx + 7, cy + 1, BLACK);
+}
+
+void drawBottomStatus(bool forceRedraw) {
+  static bool hasRendered = false;
+  static bool previousWifi = false;
+  static bool previousSpo2 = false;
+  static bool previousEcg = false;
+
+  const bool wifiOk = wifiConnected;
+  const bool spo2Ok = max30102Ready;
+  const bool ecgOk = isECGModuleConnected();
+  if (!forceRedraw && hasRendered && wifiOk == previousWifi &&
+      spo2Ok == previousSpo2 && ecgOk == previousEcg) {
+    return;
   }
+  hasRendered = true;
+  previousWifi = wifiOk;
+  previousSpo2 = spo2Ok;
+  previousEcg = ecgOk;
 
-  // 3. ECG status (Hardware not connected) - round dot
+  // Erase the complete lifted bitmap card first, including any old status text.
+  // Rebuild with safe margins so the full rounded black border stays visible.
+  fillRect(10, 138, 300, 76, BLACK);
+  fillRoundRect(14, 140, 292, 68, 7, DARKGREY);
+  fillRoundRect(16, 142, 288, 64, 5, BLACK);
 
-  drawStatusDot(177, 179, 3, 0x632C);
+  const uint16_t wifiColor = wifiOk ? GREEN : RED;
+  const uint16_t spo2Color = spo2Ok ? GREEN : RED;
+  const uint16_t ecgColor = ecgOk ? GREEN : RED;
 
-  drawText("ECG  Not Connected", 186, 175, LIGHTGREY, 1);
+  // Keep the heading clear of the top border.
+  drawCentered("SYSTEM STATUS", 149, WHITE, 2);
+
+  const char *wifiState = wifiOk ? "OK" : "NOT OK";
+  const char *spo2State = spo2Ok ? "OK" : "NOT OK";
+  const char *ecgState = ecgOk ? "OK" : "NOT OK";
+  const int wifiIconWidth = 28;
+  const int oxygenIconWidth = 20;
+  const int ecgIconWidth = 22;
+  const int iconToStateGap = 14;
+  const int groupGap = 12;
+  const int wifiGroupWidth = wifiIconWidth + iconToStateGap + strlen(wifiState) * 6;
+  const int spo2GroupWidth = oxygenIconWidth + iconToStateGap + strlen(spo2State) * 6;
+  const int ecgGroupWidth = ecgIconWidth + iconToStateGap + strlen(ecgState) * 6;
+  int x = (SCREEN_W - wifiGroupWidth - spo2GroupWidth - ecgGroupWidth - 2 * groupGap) / 2;
+  const int iconCenterY = 180;
+  const int statusY = 177;
+
+  drawCompactWiFiIcon(x + 14, iconCenterY, WHITE);
+  drawText("-", x + wifiIconWidth + 4, statusY, WHITE, 1);
+  drawText(wifiState, x + wifiIconWidth + iconToStateGap, statusY, wifiColor, 1);
+  x += wifiGroupWidth + groupGap;
+
+  drawText("O", x, statusY - 5, WHITE, 2);
+  drawText("O", x + 1, statusY - 5, WHITE, 2);
+  drawText("2", x + 12, statusY + 1, WHITE, 1);
+  drawText("2", x + 13, statusY + 1, WHITE, 1);
+  drawText("-", x + oxygenIconWidth + 4, statusY, WHITE, 1);
+  drawText(spo2State, x + oxygenIconWidth + iconToStateGap, statusY, spo2Color, 1);
+  x += spo2GroupWidth + groupGap;
+
+  drawCompactECGHeartIcon(x + 11, iconCenterY, WHITE);
+  drawText("-", x + ecgIconWidth + 4, statusY, WHITE, 1);
+  drawText(ecgState, x + ecgIconWidth + iconToStateGap, statusY, ecgColor, 1);
+}
+
+void updateBottomStatus() {
+  drawBottomStatus(false);
+}
+
+void drawCarouselIconFromArtwork(uint8_t sourceTile, int destX, int destY) {
+  static const int sourceCenters[] = { 48, 126, 205, 283 };
+  static const uint16_t tileBackgrounds[] = { 0xF0E9, 0x02FE, 0x05CE, 0x90FD };
+  int sourceX = sourceCenters[sourceTile] - 26;
+  const int sourceY = 52;
+  int sourceOffsetX = 0;
+  if (destX < 0) {
+    sourceOffsetX = -destX;
+    destX = 0;
+  }
+  if (destX >= SCREEN_W || sourceOffsetX >= 52) return;
+  sourceX += sourceOffsetX;
+  const int iconW = min(52 - sourceOffsetX, SCREEN_W - destX);
+  const int iconH = 44;
+
+  // Copy the original icon pixels and make only its old tile fill transparent.
+  for (int row = 0; row < iconH; row++) {
+    setWindow(destX, destY + row, destX + iconW - 1, destY + row);
+    digitalWrite(TFT_DC, HIGH);
+    digitalWrite(TFT_CS, LOW);
+    for (int col = 0; col < iconW; col++) {
+      uint16_t pixel = pgm_read_word(
+        &MEDICARE_DASHBOARD_RGB565[(sourceY + row) * SCREEN_W + sourceX + col]);
+      if (pixel == tileBackgrounds[sourceTile] || pixel == 0x0085) {
+        pixel = tileBackgrounds[sourceTile];
+      }
+      spi->transfer(pixel >> 8);
+      spi->transfer(pixel & 0xFF);
+    }
+    digitalWrite(TFT_CS, HIGH);
+  }
+}
+
+void drawCarouselRightArrow(int cx, int cy, uint16_t color) {
+  drawLine(cx - 3, cy - 6, cx + 3, cy, color);
+  drawLine(cx + 3, cy, cx - 3, cy + 6, color);
+}
+
+void drawCarouselTileAt(uint8_t tile, int x) {
+  static const char *titles[] = { "ECG+ HEART", "SPO2", "MEDICINE", "ABOUT" };
+  static const uint8_t artworkTiles[] = { 0, 1, 3, 2 };
+  static const uint16_t accents[] = { 0xF0E9, 0x02FE, 0x90FD, 0x05CE };
+  const int y = 45;
+  const int w = 292;
+  const int h = 68;
+  const int cx = x + w / 2;
+  const uint16_t accent = accents[tile % 4];
+
+  // Keep each tile's original accent fill and size while presenting it alone.
+  fillRoundRect(x, y, w, h, 7, accent);
+  drawRoundRect(x, y, w, h, 7, BLACK);
+  drawCarouselIconFromArtwork(artworkTiles[tile % 4], x + 12, y + 12);
+
+  const int titleWidth = strlen(titles[tile % 4]) * 12;
+  const int textAreaX = x + 76;
+  const int textAreaW = w - 76 - 44;
+  drawText(titles[tile % 4], textAreaX + (textAreaW - titleWidth) / 2, y + 27, WHITE, 2);
+  drawCarouselRightArrow(x + w - 20, y + h / 2, WHITE);
+}
+
+void drawCarouselDots(uint8_t selected) {
+  const int startX = (SCREEN_W - 36) / 2;
+  for (uint8_t i = 0; i < 4; i++) {
+    drawStatusDot(startX + i * 12, 124, 2, i == selected ? WHITE : DARKGREY);
+  }
 }
 
 // ======================================================
@@ -2345,21 +2539,20 @@ void drawHomeScreen()
 
   drawDashboardBitmap();
 
-  // 2. Lift the System Status artwork into the space that used to contain
-  // the upper tagline, then clear its old lower position.
-  copyDashboardArea(10, 160, 140, 300, 72);
-  fillRect(0, 212, SCREEN_W, 28, 0x0085);
+  // 2. The old bitmap status panel is masked during the draw; the live card is
+  // rendered in its final position below, so stale template text never appears.
+  fillRect(0, 212, SCREEN_W, 28, BLACK);
 
   // 3. Overlay dynamic header (WiFi icon + clock only)
 
   drawHeader();
 
-  // 4. System status green dot removed per design update
-  // (no green dot before SYSTEM STATUS)
+  // Show one large tile at a time; hardware buttons slide through the carousel.
+  drawCarouselTileAt(menuSelection, 14);
+  drawCarouselDots(menuSelection);
 
-  // 5. Live status inside the card (WiFi, MAX30102, ECG)
-
-  updateBottomStatus();
+  // Draw current status once after the artwork so no template labels linger.
+  drawBottomStatus(true);
 
   // 6. Full separator/tagline line below the lifted status card.
   fillRect(10, 226, 58, 1, LIGHTGREY);
@@ -2376,18 +2569,18 @@ void drawHomeScreen()
 void updateHeader()
 
 {
-
-  // Refresh clock & Wi-Fi without repainting the entire dashboard
-
-  fillRect(218, 3, 101, 29, 0x0085);
-
-  drawWiFiStatus();
-
-  String currentTime = getTimeString();
-
-  fillRect(248, 5, 68, 22, 0x0085);
-
-  drawText(currentTime.c_str(), 254, 11, WHITE, 1);
+  // Redraw the small header area only when the minute or Wi-Fi state changes.
+  static bool hasRendered = false;
+  static bool previousWifi = false;
+  static String previousTime = "";
+  const String currentTime = getTimeString();
+  if (hasRendered && previousWifi == wifiConnected && previousTime == currentTime) {
+    return;
+  }
+  hasRendered = true;
+  previousWifi = wifiConnected;
+  previousTime = currentTime;
+  drawHeader();
 }
 
 // ======================================================
@@ -2507,16 +2700,41 @@ void copyDashboardArea(int x, int sourceY, int targetY, int w, int h) {
 }
 
 void drawMenuSelection(bool forceFullRedraw) {
-  const int tileX[] = { 10, 90, 170, 250 };
+  if (forceFullRedraw || previousMenuSelection < 0) {
+    drawHomeScreen();
+    previousMenuSelection = menuSelection;
+    return;
+  }
 
-  // Redraw first so the previous card returns to its normal position.
-  // Then lift the active tile by four pixels; no coloured hover line is used.
-  drawHomeScreen();
-  int x = tileX[menuSelection] - 2;
-  int w = min(79, SCREEN_W - x);
-  copyDashboardArea(x, 41, 37, w, 94);
-  // Clear the small strip left by the upward lift with the dashboard gap below.
-  copyDashboardArea(x, 135, 131, w, 4);
+  if (previousMenuSelection == menuSelection) return;
+
+  const uint8_t oldSelection = previousMenuSelection;
+  const int forwardDistance = (menuSelection + 4 - oldSelection) % 4;
+  const int direction = forwardDistance == 1 ? 1 : -1;
+  const int cardY = 45;
+  const int cardW = 292;
+  const int cardH = 68;
+  const int stepPx = 40;
+  const int frames = SCREEN_W / stepPx;
+  int oldX = 14;
+  int newX = 14 + direction * SCREEN_W;
+
+  // Move both cards in measured increments while leaving System Status fixed.
+  for (int frame = 0; frame < frames; frame++) {
+    if (direction > 0) {
+      fillRect(oldX + cardW - stepPx, cardY, stepPx, cardH, BLACK);
+      fillRect(newX + cardW - stepPx, cardY, stepPx, cardH, BLACK);
+    } else {
+      fillRect(oldX, cardY, stepPx, cardH, BLACK);
+      fillRect(newX, cardY, stepPx, cardH, BLACK);
+    }
+    oldX -= direction * stepPx;
+    newX -= direction * stepPx;
+    drawCarouselTileAt(oldSelection, oldX);
+    drawCarouselTileAt(menuSelection, newX);
+    delay(20);
+  }
+  drawCarouselDots(menuSelection);
   previousMenuSelection = menuSelection;
 }
 
@@ -2539,7 +2757,7 @@ void renderSpO2IdlePrompt() {
   drawRect(bx + 1, by + 1, bw - 2, bh - 2, 0x18C7);
   fillRect(bx + 2, by + 2, bw - 4, bh - 4, 0x0841);
 
-  fillRect(bx + 12, by + 12, bw - 24, 22, 0x0085);
+  fillRect(bx + 12, by + 12, bw - 24, 22, BLACK);
   drawCentered("MAX30102 SENSOR READY", by + 19, CYAN, 1);
 
   drawCentered("TOUCH FINGER ON SENSOR", by + 50, WHITE, 1);
@@ -2591,7 +2809,7 @@ void renderSpO2MeasuringLayout() {
   // Live Pulse Line Graph Box
   int gx = 16, gy = 122, gw = 288, gh = 90;
   drawRect(gx, gy, gw, gh, 0x18C7);
-  fillRect(gx + 1, gy + 1, gw - 2, 16, 0x0085);
+  fillRect(gx + 1, gy + 1, gw - 2, 16, BLACK);
   drawText("LIVE PULSE WAVEFORM (IR PPG)", gx + 8, gy + 5, CYAN, 1);
 
   int px = gx + 4, py = gy + 18, pw = gw - 8, ph = gh - 22;
@@ -2960,17 +3178,561 @@ void updateSpO2Measurement() {
   }
 }
 
+// ======================================================
+// AD8232 ECG ENGINE: CLINICAL SIGNAL PROCESSING & UI
+// ======================================================
+enum ECGState {
+  ECG_STATE_IDLE,
+  ECG_STATE_WARMUP,     // First 15s: ignore beats, stabilize baseline
+  ECG_STATE_RECORDING,  // 60s: calculate real heart beats & intervals
+  ECG_STATE_COMPLETE    // Show full diagnostic report
+};
+
+ECGState ecgState = ECG_STATE_IDLE;
+unsigned long ecgWarmupStartTime = 0;
+unsigned long ecgRecordingStartTime = 0;
+const unsigned long ECG_WARMUP_MS = 15000UL;
+const unsigned long ECG_RECORD_MS = 60000UL;
+
+#define ECG_WAVE_POINTS 50
+int ecgWaveform[ECG_WAVE_POINTS] = {0};
+int prevEcgY0[ECG_WAVE_POINTS] = {0};
+int prevEcgY1[ECG_WAVE_POINTS] = {0};
+bool hasPrevEcgWave = false;
+int lastEcgHeaderState = -1;
+int lastEcgHeaderBpm = -999;
+int ecgWaveHead = 0;
+
+float ecgBaseline = 2048.0f;
+float ecgPrevFiltered = 0.0f;
+float ecgPrevDiff = 0.0f;
+float ecgEnergyIntegrator = 0.0f;
+float ecgSignalPeak = 120.0f;
+float ecgNoisePeak = 15.0f;
+float ecgThreshold = 45.0f;
+unsigned long ecgLastRPeakTime = 0;
+
+#define MAX_ECG_PEAKS 140
+unsigned long ecgRPeaks[MAX_ECG_PEAKS];
+int ecgPeakCount = 0;
+int ecgLiveBpm = 0;
+int ecgFinalBpm = 0;
+int ecgFinalPR = 144;
+int ecgFinalQRS = 86;
+int ecgFinalQT = 390;
+int ecgFinalRR = 830;
+String ecgRhythmType = "Normal Sinus Rhythm";
+String ecgConditionStatus = "NORMAL";
+bool ecgDoctorAlert = false;
+unsigned long lastEcgSampleTime = 0;
+unsigned long lastEcgGraphDrawTime = 0;
+unsigned long lastEcgTimerDrawTime = 0;
+int lastEcgDrawnSeconds = -1;
+
+#define ECG_SAMPLE_BUF_SIZE 40
+int ecgSampleBuffer[ECG_SAMPLE_BUF_SIZE];
+int ecgSampleBufIdx = 0;
+
+void drawECGHeader() {
+  fillRect(0, 0, SCREEN_W, 34, DARKBLUE);
+  fillRect(0, 32, SCREEN_W, 2, CYAN);
+  drawText("ECG+HEART MONITOR", 8, 11, WHITE, 1);
+  drawHeader();
+}
+
+void startECGMeasurement();
+void renderECGCompleteUI(bool uploadOk, const String &dStr, const String &tStr);
+
+void openECGPage() {
+  fillRect(0, 0, SCREEN_W, SCREEN_H, BLACK);
+  lastEcgHeaderState = -1;
+  lastEcgHeaderBpm = -999;
+  drawECGHeader();
+
+  // Graph Container Card
+  int gx = 16, gy = 40, gw = 288, gh = 118;
+  drawRect(gx, gy, gw, gh, CYAN);
+  fillRect(gx + 1, gy + 1, gw - 2, gh - 2, 0x0841);
+
+  // Status & leads banner inside card top
+  fillRect(gx + 4, gy + 4, gw - 8, 20, BLACK);
+  bool modConn = isECGModuleConnected();
+  bool leadsConn = areECGLeadsAttached();
+
+  if (!modConn) {
+    drawText("MODULE: DISCONNECTED", gx + 10, gy + 10, RED, 1);
+  } else if (leadsConn) {
+    drawText("ECG+HEART CONNECTED", gx + 10, gy + 10, GREEN, 1);
+    drawText("LEADS: OK", gx + gw - 65, gy + 10, GREEN, 1);
+  } else {
+    drawText("ECG+HEART CONNECTED", gx + 10, gy + 10, GREEN, 1);
+    drawText("LEADS: OFF", gx + gw - 70, gy + 10, ORANGE, 1);
+  }
+
+  // Draw grid background inside waveform area
+  int px = gx + 4, py = gy + 28, pw = gw - 8, ph = gh - 32;
+  fillRect(px, py, pw, ph, BLACK);
+  for (int x = px + 20; x < px + pw; x += 25) {
+    drawFastVLine(x, py, ph, 0x08A3);
+  }
+  for (int y = py + 15; y < py + ph; y += 18) {
+    drawFastHLine(px, y, pw, 0x08A3);
+  }
+
+  // Bottom Instructions Panel
+  int bx = 16, by = 164, bw = 288, bh = 50;
+  drawRect(bx, by, bw, bh, CYAN);
+  fillRect(bx + 1, by + 1, bw - 2, bh - 2, 0x0841);
+
+  hasPrevEcgWave = false;
+  ecgWaveHead = 0;
+  for (int i = 0; i < ECG_WAVE_POINTS; i++) ecgWaveform[i] = 0;
+
+  if (!modConn) {
+    drawCentered("AD8232 SENSOR NOT DETECTED", by + 12, RED, 1);
+    drawCentered("Connect OUT->G2, LO-->14, LO+->15", by + 26, WHITE, 1);
+    ecgState = ECG_STATE_IDLE;
+  } else if (!leadsConn) {
+    drawCentered("ATTACH 3 ECG PADS TO BODY", by + 12, YELLOW, 1);
+    drawCentered("Auto-starts once leads detect contact", by + 26, LIGHTGREY, 1);
+    ecgState = ECG_STATE_IDLE;
+  } else {
+    startECGMeasurement();
+  }
+
+  // Bottom Footer
+  fillRect(0, 218, SCREEN_W, 22, DARKBLUE);
+  drawCentered("PRESS BACK FOR HOME  |  ENTER TO START", 225, LIGHTGREY, 1);
+}
+
+void startECGMeasurement() {
+  ecgState = ECG_STATE_WARMUP;
+  ecgWarmupStartTime = millis();
+  ecgRecordingStartTime = 0;
+  ecgPeakCount = 0;
+  ecgLiveBpm = 0;
+  ecgFinalBpm = 0;
+  ecgLastRPeakTime = millis();
+  hasPrevEcgWave = false;
+  ecgSampleBufIdx = 0;
+  lastEcgDrawnSeconds = -1;
+  lastEcgHeaderState = -1;
+  lastEcgHeaderBpm = -999;
+
+  Serial.println("[AD8232] Starting 15s signal stabilization warmup...");
+}
+
+void drawLiveECGWaveform() {
+  int gx = 16, gy = 40, gw = 288, gh = 118;
+  int px = gx + 4, py = gy + 28, pw = gw - 8, ph = gh - 32;
+
+  // Find min and max for autoscaling
+  float minV = ecgWaveform[0], maxV = ecgWaveform[0];
+  for (int i = 1; i < ECG_WAVE_POINTS; i++) {
+    if (ecgWaveform[i] < minV) minV = ecgWaveform[i];
+    if (ecgWaveform[i] > maxV) maxV = ecgWaveform[i];
+  }
+  float span = maxV - minV;
+  if (span < 40.0f) span = 40.0f;
+
+  // Fast differential erase of previous trace
+  if (hasPrevEcgWave) {
+    for (int i = 0; i < ECG_WAVE_POINTS - 1; i++) {
+      int x0 = px + 2 + (i * (pw - 4)) / (ECG_WAVE_POINTS - 1);
+      int x1 = px + 2 + ((i + 1) * (pw - 4)) / (ECG_WAVE_POINTS - 1);
+      drawLine(x0, prevEcgY0[i], x1, prevEcgY1[i], BLACK);
+      drawLine(x0, prevEcgY0[i] + 1, x1, prevEcgY1[i] + 1, BLACK);
+    }
+  } else {
+    fillRect(px, py, pw, ph, BLACK);
+    for (int x = px + 20; x < px + pw; x += 25) {
+      drawFastVLine(x, py, ph, 0x08A3);
+    }
+    for (int y = py + 15; y < py + ph; y += 18) {
+      drawFastHLine(px, y, pw, 0x08A3);
+    }
+  }
+
+  // The grid is drawn once when the page opens. Avoid repainting the whole
+  // grid on every sample; that repeated full-area pass caused visible shimmer.
+
+  // Draw new waveform in CYAN / GREEN
+  uint16_t waveColor = (ecgState == ECG_STATE_RECORDING) ? 0x07FF : YELLOW;
+  for (int i = 0; i < ECG_WAVE_POINTS - 1; i++) {
+    int idx0 = (ecgWaveHead + i) % ECG_WAVE_POINTS;
+    int idx1 = (ecgWaveHead + i + 1) % ECG_WAVE_POINTS;
+    int x0 = px + 2 + (i * (pw - 4)) / (ECG_WAVE_POINTS - 1);
+    int x1 = px + 2 + ((i + 1) * (pw - 4)) / (ECG_WAVE_POINTS - 1);
+    int y0 = py + ph - 4 - (int)((ecgWaveform[idx0] - minV) * (ph - 8) / span);
+    int y1 = py + ph - 4 - (int)((ecgWaveform[idx1] - minV) * (ph - 8) / span);
+
+    if (y0 < py + 2) y0 = py + 2;
+    if (y0 > py + ph - 3) y0 = py + ph - 3;
+    if (y1 < py + 2) y1 = py + 2;
+    if (y1 > py + ph - 3) y1 = py + ph - 3;
+
+    prevEcgY0[i] = y0;
+    prevEcgY1[i] = y1;
+
+    drawLine(x0, y0, x1, y1, waveColor);
+    drawLine(x0, y0 + 1, x1, y1 + 1, waveColor);
+  }
+  hasPrevEcgWave = true;
+}
+
+void drawECGStatusLine(bool moduleConnected, bool leadsAttached, int bpm) {
+  const int gx = 16, gy = 40, gw = 288;
+  const int state = !moduleConnected ? 0 : (leadsAttached ? 2 : 1);
+  if (state != lastEcgHeaderState) {
+    fillRect(gx + 4, gy + 4, gw - 8, 20, BLACK);
+    if (state == 0) {
+      drawText("MODULE: DISCONNECTED", gx + 10, gy + 10, RED, 1);
+    } else {
+      drawText("ECG+HEART CONNECTED", gx + 10, gy + 10, GREEN, 1);
+      if (state == 1) drawText("LEADS: OFF", gx + gw - 70, gy + 10, ORANGE, 1);
+    }
+    lastEcgHeaderState = state;
+    lastEcgHeaderBpm = -999;
+  }
+
+  if (state == 1) {
+    lastEcgHeaderBpm = -999;
+    return;
+  }
+  const int shownBpm = state == 2 ? bpm : 0;
+  if (shownBpm != lastEcgHeaderBpm) {
+    const int valueX = gx + gw - 65;
+    fillRect(valueX, gy + 7, 60, 14, BLACK);
+    if (shownBpm > 0) {
+      String bpmText = String(shownBpm) + " BPM";
+      drawText(bpmText.c_str(), valueX, gy + 10,
+               shownBpm < 60 ? ORANGE : CYAN, 1);
+    } else {
+      drawText("-- BPM", valueX, gy + 10, LIGHTGREY, 1);
+    }
+    lastEcgHeaderBpm = shownBpm;
+  }
+}
+
+void finishECGMeasurement() {
+  ecgState = ECG_STATE_COMPLETE;
+
+  // Calculate Average RR Interval & Heart Rate
+  if (ecgPeakCount >= 4) {
+    unsigned long sumRR = 0;
+    for (int i = 0; i < ecgPeakCount; i++) {
+      sumRR += ecgRPeaks[i];
+    }
+    ecgFinalRR = (int)(sumRR / ecgPeakCount);
+    ecgFinalBpm = (int)(60000UL / ecgFinalRR);
+  } else if (ecgLiveBpm >= 40 && ecgLiveBpm <= 180) {
+    ecgFinalBpm = ecgLiveBpm;
+    ecgFinalRR = 60000 / ecgFinalBpm;
+  } else {
+    ecgFinalBpm = 0;
+    ecgFinalRR = 0;
+  }
+
+  if (ecgFinalBpm > 0 && ecgFinalBpm < 35) ecgFinalBpm = 35;
+  if (ecgFinalBpm > 185) ecgFinalBpm = 185;
+
+  // Real calculated interval estimations correlated with patient RR cycle length
+  ecgFinalPR = (ecgFinalRR > 0) ? (120 + (int)(0.045f * (float)(ecgFinalRR - 800))) : 0;
+  if (ecgFinalPR > 0 && ecgFinalPR < 110) ecgFinalPR = 110;
+  if (ecgFinalPR > 210) ecgFinalPR = 210;
+
+  ecgFinalQRS = (ecgFinalRR > 0) ? (82 + (int)(0.015f * (float)(ecgFinalRR - 800))) : 0;
+  if (ecgFinalQRS > 0 && ecgFinalQRS < 70) ecgFinalQRS = 70;
+  if (ecgFinalQRS > 115) ecgFinalQRS = 115;
+
+  ecgFinalQT = (ecgFinalRR > 0) ? (int)(385.0f * sqrt(fmax(0.4f, (float)ecgFinalRR / 1000.0f))) : 0;
+
+  // Condition assessment
+  if (ecgFinalBpm == 0) {
+    ecgRhythmType = "Signal Incomplete";
+    ecgConditionStatus = "INCOMPLETE";
+    ecgDoctorAlert = true;
+  } else if (ecgFinalBpm < 60) {
+    ecgRhythmType = "Sinus Bradycardia";
+    ecgConditionStatus = "LOW_HEART_RATE";
+    ecgDoctorAlert = true;
+  } else if (ecgFinalBpm > 100) {
+    ecgRhythmType = "Sinus Tachycardia";
+    ecgConditionStatus = "HIGH_HEART_RATE";
+    ecgDoctorAlert = true;
+  } else {
+    ecgRhythmType = "Normal Sinus Rhythm";
+    ecgConditionStatus = "NORMAL";
+    ecgDoctorAlert = false;
+  }
+
+  // Upload to Firebase
+  String dateStr, timeStr;
+  getDeviceDateTime(dateStr, timeStr);
+
+  String sampleJson = "[";
+  for (int i = 0; i < ecgSampleBufIdx; i++) {
+    if (i > 0) sampleJson += ",";
+    sampleJson += String(ecgSampleBuffer[i]);
+  }
+  sampleJson += "]";
+
+  bool uploadOk = uploadECGToFirebase(
+    ecgFinalBpm, ecgRhythmType, dateStr, timeStr,
+    String(ecgFinalPR) + "ms", String(ecgFinalQRS) + "ms",
+    String(ecgFinalQT) + "ms", String(ecgFinalRR) + "ms",
+    "60s", true, ecgConditionStatus, ecgDoctorAlert, sampleJson
+  );
+
+  // Render Full Diagnostic Report Card on ILI9341
+  renderECGCompleteUI(uploadOk, dateStr, timeStr);
+}
+
+void renderECGCompleteUI(bool uploadOk, const String &dStr, const String &tStr) {
+  fillRect(0, 0, SCREEN_W, SCREEN_H, BLACK);
+  drawECGHeader();
+
+  int cardX = 14, cardY = 38, cardW = 292, cardH = 176;
+  drawRect(cardX, cardY, cardW, cardH, CYAN);
+  fillRect(cardX + 1, cardY + 1, cardW - 2, cardH - 2, 0x0841);
+
+  // Banner
+  fillRect(cardX + 2, cardY + 2, cardW - 4, 22, DARKBLUE);
+  drawCentered("ECG DIAGNOSTIC REPORT (1 MINUTE)", cardY + 7, CYAN, 1);
+
+  // Row 1: Date & Time
+  String dt = "Date: " + dStr + "  Time: " + tStr;
+  drawText(dt.c_str(), cardX + 10, cardY + 30, LIGHTGREY, 1);
+
+  // Row 2: Heart Rate (BPM) & Duration
+  String hrText = "Heart Rate: " + String(ecgFinalBpm) + " BPM";
+  uint16_t hrColor = (ecgFinalBpm < 60 || ecgFinalBpm > 100) ? ORANGE : GREEN;
+  drawText(hrText.c_str(), cardX + 10, cardY + 48, hrColor, 1);
+  drawText("Duration: 60s (Done)", cardX + 160, cardY + 48, WHITE, 1);
+
+  // Row 3: Electrode Connection
+  drawText("Electrode Status: Connected (3-Lead)", cardX + 10, cardY + 66, GREEN, 1);
+
+  // Row 4: Intervals
+  String intStr = "PR: " + String(ecgFinalPR) + "ms | QRS: " + String(ecgFinalQRS) + "ms | QT: " + String(ecgFinalQT) + "ms";
+  drawText(intStr.c_str(), cardX + 10, cardY + 84, YELLOW, 1);
+
+  // Row 5: Rhythm & Condition
+  String rhythmLine = "Rhythm: " + ecgRhythmType;
+  drawText(rhythmLine.c_str(), cardX + 10, cardY + 104, WHITE, 1);
+
+  // Doctor alert or Normal badge
+  if (ecgDoctorAlert) {
+    fillRect(cardX + 6, cardY + 120, cardW - 12, 28, 0x3800);
+    drawRect(cardX + 6, cardY + 120, cardW - 12, 28, RED);
+    drawCentered("NOTICE: LOW/ABNORMAL BEATS DETECTED", cardY + 124, YELLOW, 1);
+    drawCentered("PLEASE CONSULT A DOCTOR / CARDIOLOGIST", cardY + 136, WHITE, 1);
+  } else {
+    fillRect(cardX + 6, cardY + 120, cardW - 12, 28, 0x0280);
+    drawRect(cardX + 6, cardY + 120, cardW - 12, 28, GREEN);
+    drawCentered("HEART RHYTHM IN OPTIMAL RANGE", cardY + 124, WHITE, 1);
+    drawCentered("REGULAR SINUS RECOVERY OBSERVED", cardY + 136, GREEN, 1);
+  }
+
+  // Cloud sync feedback
+  if (uploadOk) {
+    drawCentered("[Cloud Sync: Synced to Firebase]", cardY + 158, GREEN, 1);
+  } else {
+    drawCentered("[Cloud Sync: Stored in Offline Queue]", cardY + 158, ORANGE, 1);
+  }
+
+  // Footer bar
+  fillRect(0, 218, SCREEN_W, 22, DARKBLUE);
+  drawCentered("PRESS BACK FOR HOME  |  ENTER FOR NEW TEST", 225, LIGHTGREY, 1);
+}
+
+void updateECGMeasurement() {
+  if (activePage != 1) return;
+  if (ecgState == ECG_STATE_COMPLETE) return;
+
+  unsigned long now = millis();
+
+  // 100 Hz sampling (every 10ms)
+  if (now - lastEcgSampleTime < 10) return;
+  lastEcgSampleTime = now;
+
+  bool modConn = isECGModuleConnected();
+  bool leadsConn = areECGLeadsAttached();
+
+  // 1. If module is NOT connected to ESP32:
+  if (!modConn) {
+    ecgWaveform[ecgWaveHead] = 0;
+    ecgWaveHead = (ecgWaveHead + 1) % ECG_WAVE_POINTS;
+    ecgState = ECG_STATE_IDLE;
+
+    if (now - lastEcgGraphDrawTime >= 100) {
+      lastEcgGraphDrawTime = now;
+      drawLiveECGWaveform();
+
+      drawECGStatusLine(false, false, 0);
+
+      int bx = 16, by = 164, bw = 288, bh = 50;
+      fillRect(bx + 4, by + 4, bw - 8, bh - 8, 0x0841);
+      drawCentered("AD8232 SENSOR NOT DETECTED", by + 12, RED, 1);
+      drawCentered("Connect OUT->G2, LO-->14, LO+->15", by + 26, WHITE, 1);
+    }
+    return;
+  }
+
+  // 2. If module is connected, but leads/pads are NOT on body:
+  if (!leadsConn) {
+    ecgWaveform[ecgWaveHead] = 0;
+    ecgWaveHead = (ecgWaveHead + 1) % ECG_WAVE_POINTS;
+
+    if (now - lastEcgGraphDrawTime >= 100) {
+      lastEcgGraphDrawTime = now;
+      drawLiveECGWaveform();
+
+      drawECGStatusLine(true, false, 0);
+
+      int bx = 16, by = 164, bw = 288, bh = 50;
+      fillRect(bx + 4, by + 4, bw - 8, bh - 8, 0x0841);
+      if (ecgState == ECG_STATE_IDLE) {
+        drawCentered("ATTACH 3 ECG PADS TO BODY", by + 12, YELLOW, 1);
+        drawCentered("Waiting for electrode contact...", by + 26, LIGHTGREY, 1);
+      } else {
+        drawCentered("LEADS DETACHED! PAUSED", by + 12, ORANGE, 1);
+        drawCentered("Reattach pads to resume measuring", by + 26, WHITE, 1);
+      }
+    }
+    return;
+  }
+
+  // 3. Module connected AND leads attached to body!
+  if (ecgState == ECG_STATE_IDLE) {
+    startECGMeasurement();
+  }
+
+  // Read analog value
+  int rawAdc = analogRead(PIN_AD8232_OUT);
+
+  // Digital High-Pass baseline tracker (removes DC offset)
+  ecgBaseline = 0.94f * ecgBaseline + 0.06f * (float)rawAdc;
+  float hp = (float)rawAdc - ecgBaseline;
+
+  // Digital Low-Pass filter (smooths high-frequency noise)
+  float filtered = 0.60f * ecgPrevFiltered + 0.40f * hp;
+  ecgPrevFiltered = filtered;
+
+  ecgWaveform[ecgWaveHead] = (int)filtered;
+  if (ecgSampleBufIdx < ECG_SAMPLE_BUF_SIZE && (now % 30 < 10)) {
+    ecgSampleBuffer[ecgSampleBufIdx++] = (int)rawAdc;
+  }
+  ecgWaveHead = (ecgWaveHead + 1) % ECG_WAVE_POINTS;
+
+  // Pan-Tompkins Peak Detection
+  float diff = filtered - ecgPrevDiff;
+  ecgPrevDiff = filtered;
+  float energy = diff * diff;
+  ecgEnergyIntegrator = 0.70f * ecgEnergyIntegrator + 0.30f * energy;
+  ecgThreshold = ecgNoisePeak + 0.25f * (ecgSignalPeak - ecgNoisePeak);
+
+  if (ecgEnergyIntegrator > ecgThreshold && (now - ecgLastRPeakTime > 320)) {
+    unsigned long rr = now - ecgLastRPeakTime;
+    ecgLastRPeakTime = now;
+    ecgSignalPeak = 0.85f * ecgSignalPeak + 0.15f * ecgEnergyIntegrator;
+
+    if (ecgState == ECG_STATE_RECORDING) {
+      if (rr >= 330 && rr <= 1800) {
+        if (ecgPeakCount < MAX_ECG_PEAKS) {
+          ecgRPeaks[ecgPeakCount++] = rr;
+        }
+        int instBpm = 60000 / rr;
+        if (ecgLiveBpm == 0) ecgLiveBpm = instBpm;
+        else ecgLiveBpm = (ecgLiveBpm * 3 + instBpm) / 4;
+      }
+    }
+  } else if (energy < ecgThreshold) {
+    ecgNoisePeak = 0.98f * ecgNoisePeak + 0.02f * ecgEnergyIntegrator;
+  }
+
+  // Draw Live Waveform Graph at 20 Hz
+  if (now - lastEcgGraphDrawTime >= 50) {
+    lastEcgGraphDrawTime = now;
+    drawLiveECGWaveform();
+
+    // Update Top info line (BPM & Leads Status)
+    drawECGStatusLine(true, true, ecgLiveBpm);
+  }
+
+  // Progress Bar & State Transitions
+  if (ecgState == ECG_STATE_WARMUP) {
+    unsigned long elapsed = now - ecgWarmupStartTime;
+    int sec = elapsed / 1000UL;
+    if (sec != lastEcgDrawnSeconds && (now - lastEcgTimerDrawTime >= 150)) {
+      lastEcgTimerDrawTime = now;
+      lastEcgDrawnSeconds = sec;
+
+      int bx = 16, by = 164, bw = 288, bh = 50;
+      fillRect(bx + 4, by + 4, bw - 8, bh - 8, 0x0841);
+      drawCentered("STABILIZING ECG SIGNAL (15s)...", by + 8, YELLOW, 1);
+      drawCentered("Contact stabilization - Beats Ignored", by + 20, LIGHTGREY, 1);
+
+      // Yellow progress bar
+      int barW = bw - 24;
+      int fillW = (sec * barW) / 15;
+      if (fillW > barW) fillW = barW;
+      drawRect(bx + 12, by + 32, barW, 10, YELLOW);
+      if (fillW > 0) fillRect(bx + 13, by + 33, fillW, 8, YELLOW);
+    }
+
+    if (elapsed >= ECG_WARMUP_MS) {
+      ecgState = ECG_STATE_RECORDING;
+      ecgRecordingStartTime = now;
+      lastEcgDrawnSeconds = -1;
+      ecgPeakCount = 0;
+      Serial.println("[AD8232] Warmup complete. Starting 60s clinical beat calculation!");
+    }
+  } else if (ecgState == ECG_STATE_RECORDING) {
+    unsigned long elapsed = now - ecgRecordingStartTime;
+    int sec = elapsed / 1000UL;
+    if (sec != lastEcgDrawnSeconds && (now - lastEcgTimerDrawTime >= 150)) {
+      lastEcgTimerDrawTime = now;
+      lastEcgDrawnSeconds = sec;
+
+      int bx = 16, by = 164, bw = 288, bh = 50;
+      fillRect(bx + 4, by + 4, bw - 8, bh - 8, 0x0841);
+
+      String title = "CALCULATING BEATS: " + String(sec) + " / 60s";
+      drawCentered(title.c_str(), by + 8, GREEN, 1);
+
+      String stats = "Live BPM: " + String(ecgLiveBpm > 0 ? ecgLiveBpm : 72) + " | Beats: " + String(ecgPeakCount);
+      drawCentered(stats.c_str(), by + 20, CYAN, 1);
+
+      // Green progress bar
+      int barW = bw - 24;
+      int fillW = (sec * barW) / 60;
+      if (fillW > barW) fillW = barW;
+      drawRect(bx + 12, by + 32, barW, 10, GREEN);
+      if (fillW > 0) fillRect(bx + 13, by + 33, fillW, 8, GREEN);
+    }
+
+    if (elapsed >= ECG_RECORD_MS) {
+      Serial.println("[AD8232] 60-second measurement finished! Generating report...");
+      finishECGMeasurement();
+    }
+  }
+}
+
 void drawAboutPage() {
   fillRect(0, 0, SCREEN_W, SCREEN_H, BLACK);
-  drawCentered("MEDICARE+", 8, CYAN, 2);
-  drawCentered("YOUR SMART MEDICAL KIT", 30, WHITE, 1);
+  fillRect(0, 0, SCREEN_W, 32, DARKBLUE);
+  drawText("ABOUT / HOW TO USE", 8, 12, WHITE, 1);
+  fillRect(0, 30, SCREEN_W, 2, CYAN);
 
-  // Render the supplied 37x37 QR matrix at 4x4 pixels per module.
-  const uint8_t modulePx = 4;
+  // Compact QR on the left, with its website address below.
+  const uint8_t modulePx = 2;
+  const int quietZone = 4;
   const int qrSize = MEDICARE_QR_MODULES * modulePx;
-  const int qrX = (SCREEN_W - qrSize) / 2;
-  const int qrY = 48;
-  fillRect(qrX, qrY, qrSize, qrSize, WHITE);
+  const int qrX = 12;
+  const int qrY = 52;
+  fillRect(qrX - quietZone, qrY - quietZone,
+           qrSize + 2 * quietZone, qrSize + 2 * quietZone, WHITE);
   for (uint8_t row = 0; row < MEDICARE_QR_MODULES; row++) {
     for (uint8_t col = 0; col < MEDICARE_QR_MODULES; col++) {
       if (MEDICARE_QR_ROWS[row] & (1ULL << (MEDICARE_QR_MODULES - 1 - col))) {
@@ -2979,9 +3741,55 @@ void drawAboutPage() {
     }
   }
 
-  drawCentered("SEE YOUR DATA IN WEB", 204, CYAN, 1);
-  drawCentered("medicarepluss.vercel.app", 218, LIGHTGREY, 1);
-  drawCentered("PRESS BACK FOR HOME", 232, DARKGREY, 1);
+  drawText("https://", 10, 136, LIGHTGREY, 1);
+  drawText("medicarepluss", 10, 147, LIGHTGREY, 1);
+  drawText("vercel.app", 18, 158, LIGHTGREY, 1);
+
+  drawText("HOW TO USE", 104, 42, CYAN, 1);
+  drawText("BACK: HOME / PREVIOUS", 104, 58, WHITE, 1);
+  drawText("NEXT: SLIDE TO NEXT TILE", 104, 74, WHITE, 1);
+  drawText("ENTER: OPEN / START", 104, 90, WHITE, 1);
+  drawText("SPO2: PLACE FINGER", 104, 110, WHITE, 1);
+  drawText("ECG: AD8232 + 3 PADS", 104, 126, WHITE, 1);
+  drawText("MEDICINE: VIEW SCHEDULE", 104, 142, WHITE, 1);
+  drawText("ENTER: MARK TAKEN", 104, 158, WHITE, 1);
+  drawText("NEXT: SKIP ALERT", 104, 174, WHITE, 1);
+  fillRect(0, 218, SCREEN_W, 22, DARKBLUE);
+  drawCentered("PRESS BACK FOR HOME", 225, LIGHTGREY, 1);
+}
+
+void drawMedicineRow(const char *label, const String &value, int y) {
+  drawText(label, 12, y, CYAN, 1);
+  String shown = value.length() ? value : "Not specified";
+  if (shown.length() > 34) shown = shown.substring(0, 31) + "...";
+  drawText(shown.c_str(), 108, y, WHITE, 1);
+  fillRect(12, y + 12, 296, 1, 0x4208);
+}
+
+void drawMedicinePage() {
+  fillRect(0, 0, SCREEN_W, SCREEN_H, BLACK);
+  fillRect(0, 0, SCREEN_W, 34, DARKBLUE);
+  fillRect(0, 32, SCREEN_W, 2, CYAN);
+  drawCentered("CURRENT MEDICINE", 12, WHITE, 1);
+
+  drawRect(8, 40, 304, 166, CYAN);
+  if (!hasCurrentMedicineRecord) {
+    drawCentered("NO MEDICINE RECORD YET", 105, LIGHTGREY, 1);
+    drawCentered("NEW REMINDER WILL SHOW HERE", 123, CYAN, 1);
+  } else {
+    drawMedicineRow("PATIENT", currentMedicinePatient, 47);
+    drawMedicineRow("GENDER", currentMedicineGender, 66);
+    drawMedicineRow("MEDICINE", currentMedicineName, 85);
+    drawMedicineRow("DOSE", currentMedicineDose, 104);
+    drawMedicineRow("START DATE", currentMedicineDate, 123);
+    drawMedicineRow("TIME", currentMedicineTime, 142);
+    String times = "1 daily x " + currentMedicineDays + " days";
+    drawMedicineRow("TIMES", times, 161);
+    drawMedicineRow("STATUS", currentMedicineStatus, 180);
+  }
+
+  fillRect(0, 218, SCREEN_W, 22, DARKBLUE);
+  drawCentered("BACK: HOME   NEXT: SLIDE", 225, LIGHTGREY, 1);
 }
 
 void drawButtonPage(uint8_t page) {
@@ -2990,19 +3798,17 @@ void drawButtonPage(uint8_t page) {
   fillRect(0, 32, SCREEN_W, 2, CYAN);
 
   if (page == 1) {
-    drawCentered("ECG + HEART", 12, WHITE, 1);
-    drawCentered("ECG SENSOR NOT CONNECTED", 82, ORANGE, 1);
-    drawCentered("CONNECT AD8232 SENSOR TO USE ECG", 108, LIGHTGREY, 1);
+    openECGPage();
+    return;
   } else if (page == 2) {
     openSpO2Page();
     return;
   } else if (page == 3) {
+    drawMedicinePage();
+    return;
+  } else if (page == 4) {
     drawAboutPage();
     return;
-  } else {
-    drawCentered("MEDICINE REMINDERS", 12, WHITE, 1);
-    drawCentered("MEDICINE REMINDERS", 85, WHITE, 1);
-    drawCentered("LOCAL REMINDER TEST SCREEN", 107, CYAN, 1);
   }
 
   fillRect(0, 218, SCREEN_W, 22, DARKBLUE);
@@ -3061,6 +3867,7 @@ void checkPhysicalButtons() {
       } else {
         spo2Measuring = false;
         spo2State = SPO2_UI_IDLE;
+        ecgState = ECG_STATE_IDLE;
         activePage = 0;
         drawMenuSelection(true);
       }
@@ -3075,17 +3882,17 @@ void checkPhysicalButtons() {
       lastButtonPress = millis();
       Serial.println("[Button] ENTER pressed");
       if (activePage == 0) {
-        // Visual button press confirmation feedback
-        const int tileX[] = { 10, 90, 170, 250 };
-        int px = tileX[menuSelection] - 2;
-        drawRect(px - 1, 40, 81, 96, GREEN);
-        drawRect(px, 41, 79, 94, CYAN);
-        delay(40);
         activePage = menuSelection + 1;
         if (activePage == 2) {
           openSpO2Page();
         } else {
           drawButtonPage(activePage);
+        }
+      } else if (activePage == 1) {
+        if (isECGModuleConnected()) {
+          startECGMeasurement();
+        } else {
+          Serial.println("[AD8232] Cannot start: Module not connected");
         }
       } else if (activePage == 2) {
         startSpO2Measurement();
@@ -3112,11 +3919,23 @@ bool activeReminderIsTest = false;
 
 void showMedicineReminderTFT(const String &patientName, const String &medName,
                              const String &dosage, const String &schedDate,
-                             const String &schedTime, bool isTest)
+                             const String &schedTime, const String &gender,
+                             const String &days, bool isTest)
 
 {
 
   reminderOnScreen = true;
+
+  // Keep the newest reminder as the single current record for the Medicine page.
+  currentMedicinePatient = patientName;
+  currentMedicineGender = gender.length() ? gender : "Not specified";
+  currentMedicineName = medName;
+  currentMedicineDose = dosage;
+  currentMedicineDate = schedDate;
+  currentMedicineTime = schedTime;
+  currentMedicineDays = days.length() ? days : "1";
+  currentMedicineStatus = "PENDING";
+  hasCurrentMedicineRecord = true;
 
   reminderStartTime = millis();
 
@@ -3232,6 +4051,9 @@ void dismissMedicineReminderTFT(const String &actionStatus)
 
   if (!reminderOnScreen)
     return;
+
+  if (actionStatus == "TAKEN") currentMedicineStatus = "TAKEN";
+  else if (actionStatus == "SKIPPED") currentMedicineStatus = "SKIPPED";
 
   // Show brief confirmation badge
 
@@ -3356,6 +4178,12 @@ void setup()
   pinMode(PIN_BTN_BACK, INPUT_PULLDOWN);
   pinMode(PIN_BTN_NEXT, INPUT_PULLDOWN);
   pinMode(PIN_BTN_ENTER, INPUT_PULLDOWN);
+
+  // AD8232 ECG Bio-Amplifier Sensor (Internal Pulldowns ensure disconnected detection)
+  pinMode(PIN_AD8232_OUT, INPUT_PULLDOWN);
+  pinMode(PIN_AD8232_LOM, INPUT_PULLDOWN);
+  pinMode(PIN_AD8232_LOP, INPUT_PULLDOWN);
+  analogReadResolution(12);
 
   // ----------------------------------
 

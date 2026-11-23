@@ -17,7 +17,8 @@ static const char* FIREBASE_BASE_URL = "https://medicare-plus-74a1a-default-rtdb
 extern bool reminderOnScreen;
 extern void showMedicineReminderTFT(const String &patientName, const String &medName,
                                    const String &dosage, const String &schedDate,
-                                   const String &schedTime, bool isTest);
+                                   const String &schedTime, const String &gender,
+                                   const String &days, bool isTest);
 extern void dismissMedicineReminderTFT(const String &actionStatus);
 extern void buzzerStartReminder();
 extern void buzzerStopReminder();
@@ -140,7 +141,16 @@ inline bool uploadSpO2ToFirebase(int spo2, int bpm,
 // ----------------------------------------------------------------------------
 inline bool uploadECGToFirebase(int bpm, const String &rhythm = "Normal Sinus Rhythm",
                                 const String &recordDate = "",
-                                const String &recordTime = "") {
+                                const String &recordTime = "",
+                                const String &prInterval = "140ms",
+                                const String &qrsDuration = "86ms",
+                                const String &qtInterval = "390ms",
+                                const String &rrInterval = "800ms",
+                                const String &duration = "60s",
+                                bool leadsConnected = true,
+                                const String &condition = "NORMAL",
+                                bool doctorAlert = false,
+                                const String &samplesJson = "[]") {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("[Firebase] WiFi NOT connected! Enqueueing ECG measurement for offline sync.");
     String dateStr, timeStr;
@@ -165,11 +175,18 @@ inline bool uploadECGToFirebase(int bpm, const String &rhythm = "Normal Sinus Rh
   String jsonPayload = "{";
   jsonPayload += "\"bpm\":" + String(bpm) + ",";
   jsonPayload += "\"rhythm\":\"" + rhythm + "\",";
-  jsonPayload += "\"prInterval\":\"140ms\",";
-  jsonPayload += "\"qrsDuration\":\"86ms\",";
+  jsonPayload += "\"prInterval\":\"" + prInterval + "\",";
+  jsonPayload += "\"qrsDuration\":\"" + qrsDuration + "\",";
+  jsonPayload += "\"qtInterval\":\"" + qtInterval + "\",";
+  jsonPayload += "\"rrInterval\":\"" + rrInterval + "\",";
+  jsonPayload += "\"duration\":\"" + duration + "\",";
+  jsonPayload += "\"leadsConnected\":" + String(leadsConnected ? "true" : "false") + ",";
+  jsonPayload += "\"condition\":\"" + condition + "\",";
+  jsonPayload += "\"doctorAlert\":" + String(doctorAlert ? "true" : "false") + ",";
   jsonPayload += "\"date\":\"" + dateStr + "\",";
   jsonPayload += "\"time\":\"" + timeStr + "\",";
-  jsonPayload += "\"status\":\"NORMAL\",";
+  jsonPayload += "\"status\":\"" + condition + "\",";
+  jsonPayload += "\"samples\":" + (samplesJson.length() > 0 ? samplesJson : "[]") + ",";
   jsonPayload += "\"source\":\"ESP32_AD8232\",";
   jsonPayload += "\"timestamp\":{\".sv\":\"timestamp\"}";
   jsonPayload += "}";
@@ -188,7 +205,8 @@ inline bool uploadECGToFirebase(int bpm, const String &rhythm = "Normal Sinus Rh
   int liveCode = http.PUT(jsonPayload);
   http.end();
 
-  Serial.printf("[Firebase] Uploaded ECG: BPM=%d -> HTTP POST: %d, PUT: %d\n", bpm, httpCode, liveCode);
+  Serial.printf("[Firebase] Uploaded ECG: BPM=%d, Rhythm=%s, Condition=%s -> HTTP POST: %d, PUT: %d\n",
+                bpm, rhythm.c_str(), condition.c_str(), httpCode, liveCode);
   return (httpCode == 200 || httpCode == 201);
 }
 
@@ -248,6 +266,8 @@ inline void checkFirebaseMedicineReminders() {
         String dose = getJsonValue(payload, "dosage");
         String sDate = getJsonValue(payload, "scheduledDate");
         String sTime = getJsonValue(payload, "scheduledTime");
+        String gender = getJsonValue(payload, "gender");
+        String days = getJsonValue(payload, "days");
 
         if (!isMedicineReminderDue(sDate, sTime)) {
           http.end();
@@ -269,7 +289,8 @@ inline void checkFirebaseMedicineReminders() {
         buzzerStartReminder();
 
         // Show reminder card on 320x240 ILI9341 display
-        showMedicineReminderTFT(patient, activeReminderName, dose, sDate, sTime, false);
+        showMedicineReminderTFT(patient, activeReminderName, dose, sDate, sTime,
+                                gender, days, false);
       }
     }
   } else {

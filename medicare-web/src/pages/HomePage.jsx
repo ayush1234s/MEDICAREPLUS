@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Activity, 
   Heart, 
@@ -9,13 +9,20 @@ import {
   CheckCircle, 
   ShieldAlert
 } from 'lucide-react';
+import { getEcgConnectionState } from '../sensorStatus';
 
 export default function HomePage({ onNavigate, liveVitals, medicines = [], user, userProfile }) {
   const [advisoryLanguage, setAdvisoryLanguage] = useState('en');
+  const [clock, setClock] = useState(Date.now());
   const pendingMedicinesCount = medicines.filter(m => m.status === 'Pending').length;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Night';
   const patientName = userProfile?.name || user?.displayName || user?.email?.split('@')[0] || 'Patient';
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, []);
+  const ecgConnected = getEcgConnectionState(liveVitals?.ecg, clock) === 'connected';
 
   return (
     <div className="space-y-10 pb-16">
@@ -32,10 +39,10 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
           {/* Live Device Pill */}
           <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 text-xs font-semibold mb-6 shadow-sm">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              {ecgConnected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${ecgConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
             </span>
-            <span>ESP32 Hardware Connected: Cloud Sync Active</span>
+            <span>MEDICARE+ Device: {ecgConnected ? 'Connected' : 'Disconnected'} · Cloud Sync Active</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-[-0.045em] leading-[.98] mb-5">
@@ -120,14 +127,14 @@ export default function HomePage({ onNavigate, liveVitals, medicines = [], user,
 
             <div className="glass-card rounded-2xl p-4 border border-white/10">
               <div className="flex items-center justify-between text-slate-400 text-xs mb-2 font-medium">
-                <span>Kit Link Status</span>
+                <span>MEDICARE+ Device Status</span>
                 <Wifi className="w-4 h-4 text-cyan-400" />
               </div>
-              <div className="text-xl font-bold text-emerald-400">
-                Online
+              <div className={`text-xl font-bold ${ecgConnected ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {ecgConnected ? 'Device Connected' : 'Device Disconnected'}
               </div>
               <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1 mt-1">
-                Firebase RTDB
+                Firebase RTDB · Smart Kit
               </span>
             </div>
           </div>
